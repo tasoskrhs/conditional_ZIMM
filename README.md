@@ -47,14 +47,14 @@ optional arguments:
 ```
 
 
-Training has three demonstration systems:
+Training has two options for the generator network:
 1. Train the network over a Swiss-Roll using conditional feedforward neural networks (cFNN):
 ```
 python main_swiss_LIP.py 
 ```
 2. Train the network over a Swiss-Roll using conditional Gaussian Mixture Model (cGMM):
 ```
-python main_swiss_LIP_GM.py 
+python main_swiss_LIP_GMM.py 
 ```
 
 ## Inference
