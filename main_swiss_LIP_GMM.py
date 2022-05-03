@@ -9,7 +9,7 @@ from model import GMM_generator, FNN_discriminator
 from data_loading import load_data
 from training import train_step_D_GP_GMM, train_step_G_GMM_Spen, sample_Z
 from cumulant_losses import discriminator_cum_loss, generator_cum_loss
-from plotting_functions import plot_color
+from plotting_functions import plot_color, plot_losses_over_steps
 
 
 def parse_args():
@@ -39,13 +39,8 @@ def parse_args():
         type=str, default='./input_data/swiss2D_N_10000_eps_0.2_cont_label_at_0_1.mat'
     )
     parser.add_argument(
-        '--beta', dest='beta',
-        help='beta parameter of cumulant loss',
-        type=float, default=0.5
-    )
-    parser.add_argument(
-        '--gamma', dest='gamma',
-        help='gamma parameter of cumulant loss',
+        '--alpha', dest='alpha',
+        help='alpha parameter of cumulant loss',
         type=float, default=0.5
     )
     parser.add_argument(
@@ -87,6 +82,11 @@ def parse_args():
         '--saved_model_name', dest='saved_model_name',
         help='saved model name',
         type=str, default='ckpt'
+    )
+    parser.add_argument(
+        '--output_fname', dest='output_fname',
+        help='name of the output file directory, for this experiment',
+        type=str, default='plots_all_data_GMM'
     )
 
     return parser.parse_args()
@@ -144,8 +144,8 @@ def main():
 
     if not os.path.exists('./output_files'):
         os.makedirs('./output_files')
-    if not os.path.exists('./output_files/plots_all_data_GMM'):
-        os.makedirs('./output_files/plots_all_data_GMM')
+    if not os.path.exists('./output_files/' + args.output_fname):
+        os.makedirs('./output_files/' + args.output_fname)
 
     ####################
     #  Training
@@ -180,7 +180,7 @@ def main():
             x_gen = generator(y_sample_emb, training=False)
 
             fig = plot_color(x_gen, y_sample, x_data_test[:NoT, :], 20, 'conditional FNN')
-            plt.savefig('output_files/plots_all_data_GMM/plots{}.png'.format(str(i).zfill(3)), bbox_inches='tight',
+            plt.savefig('output_files/' + args.output_fname + '/plots{}.png'.format(str(i).zfill(3)), bbox_inches='tight',
                         format='png', dpi=100)
             plt.close(fig)
 
@@ -203,14 +203,14 @@ def main():
             #                                                     discriminator_opt, batch_size, args.lam_gp, args.K_lip)
             discriminator_loss_i, total_loss_i = train_step_D_GP_GMM(X_mb, y_mb_emb, Z_dim, discriminator, generator,
                                                                      discriminator_opt, batch_size, args.lam_gp,
-                                                                     args.K_lip)
+                                                                     args.K_lip, args.alpha)
 
-            discriminator_losses.append(discriminator_loss_i)
-            total_losses.append(total_loss_i)
+        discriminator_losses.append(discriminator_loss_i)
+        total_losses.append(total_loss_i)
 
         # generator_loss_i = train_step_G(y_mb_emb, Z_dim, discriminator, generator, generator_opt, batch_size)
         #generator_loss_i = train_step_G_GMM(y_mb_emb, Z_dim, discriminator, generator, generator_opt, batch_size)
-        generator_loss_i, _ = train_step_G_GMM_Spen(y_mb_emb, Z_dim, discriminator, generator, generator_opt, batch_size, args.spen)
+        generator_loss_i, _ = train_step_G_GMM_Spen(y_mb_emb, Z_dim, discriminator, generator, generator_opt, batch_size, args.spen, args.alpha)
         generator_losses.append(generator_loss_i)
 
         if i % steps_per_print == 0:
@@ -232,9 +232,12 @@ def main():
                   (i, generator_loss_epoch, discriminator_loss_epoch)
                   )
 
-        # Save the model every 100 steps
+        # Save the model every 1000 steps
         if (i + 1) % 1000 == 0:
             checkpoint.save(file_prefix=checkpoint_prefix)
+
+    # plot Losses during steps (over mini-batches)
+    plot_losses_over_steps(discriminator_losses, generator_losses, save_fname=args.output_fname, alpha=args.alpha)
 
     print("end of main!")
 

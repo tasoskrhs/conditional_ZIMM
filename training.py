@@ -5,7 +5,7 @@ from cumulant_losses import discriminator_cum_loss, generator_cum_loss
 
 
 @tf.function  # "compile" this function (for graph execution and faster performance)
-def train_step_G(y, Z_dim, discriminator, generator, g_optimizer, batch_size):
+def train_step_G(y, Z_dim, discriminator, generator, g_optimizer, batch_size, alpha):
     Z = sample_Z(batch_size, Z_dim)
 
     with tf.GradientTape() as generator_tape:
@@ -14,7 +14,7 @@ def train_step_G(y, Z_dim, discriminator, generator, g_optimizer, batch_size):
         D_fake = discriminator(tf.concat(axis=1, values=[G_sample, y]), training=False)  # NOTE!! Do not update weights!
 
         # compute loss
-        generator_loss = generator_cum_loss(D_fake)
+        generator_loss = generator_cum_loss(D_fake, alpha)
 
     # compute Gradients for generator
     grads_generator_loss = generator_tape.gradient(
@@ -31,7 +31,7 @@ def train_step_G(y, Z_dim, discriminator, generator, g_optimizer, batch_size):
 
 
 @tf.function
-def train_step_D(x, y, Z_dim, discriminator, generator, d_optimizer, batch_size):
+def train_step_D(x, y, Z_dim, discriminator, generator, d_optimizer, batch_size, alpha):
     Z = sample_Z(batch_size, Z_dim)
 
     with tf.GradientTape() as discriminator_tape:
@@ -41,7 +41,7 @@ def train_step_D(x, y, Z_dim, discriminator, generator, d_optimizer, batch_size)
         D_fake = discriminator(tf.concat(axis=1, values=[G_sample, y]), training=True)
 
         # compute loss
-        discriminator_loss = discriminator_cum_loss(D_real, D_fake)
+        discriminator_loss = discriminator_cum_loss(D_real, D_fake, alpha)
 
     # compute Gradients for discriminator
     grads_discriminator_loss = discriminator_tape.gradient(
@@ -88,7 +88,7 @@ def gradient_penalty(discriminator, x, G_sample, y, K, mb_size):
 
 # use Gradient Penalty on the total loss...
 @tf.function
-def train_step_D_GP(x, y, Z_dim, discriminator, generator, d_optimizer, batch_size, lam_gp, K):
+def train_step_D_GP(x, y, Z_dim, discriminator, generator, d_optimizer, batch_size, lam_gp, K, alpha):
     Z = sample_Z(batch_size, Z_dim)
 
     with tf.GradientTape() as discriminator_tape:
@@ -98,7 +98,7 @@ def train_step_D_GP(x, y, Z_dim, discriminator, generator, d_optimizer, batch_si
         D_fake = discriminator(tf.concat(axis=1, values=[G_sample, y]), training=True)
 
         # compute loss
-        discriminator_loss = discriminator_cum_loss(D_real, D_fake)
+        discriminator_loss = discriminator_cum_loss(D_real, D_fake, alpha)
 
         # compute GP
         gp = gradient_penalty(partial(discriminator, training=True),
@@ -121,14 +121,14 @@ def train_step_D_GP(x, y, Z_dim, discriminator, generator, d_optimizer, batch_si
 
 # training of generator, which is a GMM
 @tf.function
-def train_step_G_GMM(y, Z_dim, discriminator, generator, g_optimizer, batch_size):
+def train_step_G_GMM(y, Z_dim, discriminator, generator, g_optimizer, batch_size, alpha):
     with tf.GradientTape() as generator_tape:
         # build model
         G_sample = generator(y, training=True)
         D_fake = discriminator(tf.concat(axis=1, values=[G_sample, y]), training=False)  # NOTE!! Do not update weights!
 
         # compute loss
-        generator_loss = generator_cum_loss(D_fake)
+        generator_loss = generator_cum_loss(D_fake, alpha)
 
     # compute Gradients for generator
     grads_generator_loss = generator_tape.gradient(
@@ -146,7 +146,7 @@ def train_step_G_GMM(y, Z_dim, discriminator, generator, g_optimizer, batch_size
 
 # training of discriminator, generator is a GMM
 @tf.function
-def train_step_D_GP_GMM(x, y, Z_dim, discriminator, generator, d_optimizer, batch_size, lam_gp, K):
+def train_step_D_GP_GMM(x, y, Z_dim, discriminator, generator, d_optimizer, batch_size, lam_gp, K, alpha):
     with tf.GradientTape() as discriminator_tape:
         # build model
         D_real = discriminator(tf.concat(axis=1, values=[x, y]), training=True)
@@ -154,7 +154,7 @@ def train_step_D_GP_GMM(x, y, Z_dim, discriminator, generator, d_optimizer, batc
         D_fake = discriminator(tf.concat(axis=1, values=[G_sample, y]), training=True)
 
         # compute loss
-        discriminator_loss = discriminator_cum_loss(D_real, D_fake)
+        discriminator_loss = discriminator_cum_loss(D_real, D_fake, alpha)
 
         # compute GP
         gp = gradient_penalty(partial(discriminator, training=True),
@@ -177,14 +177,14 @@ def train_step_D_GP_GMM(x, y, Z_dim, discriminator, generator, d_optimizer, batc
 
 # training of generator, which is a GMM. Sigma Penalty
 @tf.function
-def train_step_G_GMM_Spen(y, Z_dim, discriminator, generator, g_optimizer, batch_size, spen):
+def train_step_G_GMM_Spen(y, Z_dim, discriminator, generator, g_optimizer, batch_size, spen, alpha):
     with tf.GradientTape() as generator_tape:
         # build model
         G_sample = generator(y, training=True)
         D_fake = discriminator(tf.concat(axis=1, values=[G_sample, y]), training=False)  # NOTE!! Do not update weights!
 
         # compute loss
-        generator_loss = generator_cum_loss(D_fake)
+        generator_loss = generator_cum_loss(D_fake, alpha)
 
         # compute Sigma Penalty
         sig_loss = tf.reduce_sum(
