@@ -1,14 +1,14 @@
 """ Synthetic data example
-    Lipschitz version using gradient penalty and FNN (gated)"""
+    Lipschitz version using gradient penalty and ZIMM"""
 import argparse
 import tensorflow as tf
 import numpy as np
 import os
 import matplotlib.pyplot as plt
 
-from model import FNN_Gated_generator, FNN_discriminator
+from model import ZIMM_generator, FNN_discriminator
 from data_loading import load_synth_data
-from training import train_step_D_GP, train_step_G, sample_Z
+from training import train_step_D_GP_GMM, train_step_G_GMM, sample_Z
 from cumulant_losses import discriminator_cum_loss, generator_cum_loss
 from plotting_functions import plot_50genes, plot_losses_over_steps
 
@@ -16,7 +16,7 @@ from plotting_functions import plot_50genes, plot_losses_over_steps
 def parse_args():
     """Parse input arguments."""
     parser = argparse.ArgumentParser(
-        description='Synth mRNA Data Training FNN (gated)'
+        description='Synth mRNA Data Training (ZIMM)'
     )
     # Model to train/test and other parameters
     parser.add_argument(
@@ -47,7 +47,7 @@ def parse_args():
     parser.add_argument(
         '--K', dest='K',
         help='number of GMM modes',
-        type=int, default=30
+        type=int, default=20
     )
     parser.add_argument(
         '--K_lip', dest='K_lip',
@@ -87,7 +87,7 @@ def parse_args():
     parser.add_argument(
         '--output_fname', dest='output_fname',
         help='name of the output file directory, for this experiment',
-        type=str, default='plots_cond_cond_GATING_uniform'
+        type=str, default='plots_cond_cond_ZIMM_uniform'
     )
 
     return parser.parse_args()
@@ -125,7 +125,8 @@ def main():
     # print(generator.summary())
     # generator = GMM_generator(X_dim=args.d, y_dim=args.y_dim, mb_size=args.mb_size, K=args.K) # as a regular function..
     # generator = GMM_generator(X_dim=args.d, y_dim=args.y_dim, mb_size=args.mb_size, K=args.K)  # as a class declaration
-    generator = FNN_Gated_generator(noise_dim=args.Z_dim, y_dim=args.y_dim, units_list=[32, 32, args.d])
+    # generator = FNN_generator(noise_dim=args.Z_dim, y_dim=args.y_dim, units_list=[32, 32, args.d])
+    generator = ZIMM_generator(X_dim=args.d, y_dim=args.y_dim, K=args.K)  # as a class declaration
     print('instantiated generator...')
     # print(generator(tf.ones((10, args.y_dim))))
 
@@ -133,10 +134,10 @@ def main():
     generator_opt = tf.keras.optimizers.Adam(learning_rate=args.lr)
 
     # Save checkpoints
-    if not os.path.exists('./training_checkpoints_synth_data_FNN'):
-        os.makedirs('./training_checkpoints_synth_data_FNN')
+    if not os.path.exists('./training_checkpoints_synth_data_ZIMM'):
+        os.makedirs('./training_checkpoints_synth_data_ZIMM')
 
-    checkpoint_dir = './training_checkpoints_synth_data_FNN'
+    checkpoint_dir = './training_checkpoints_synth_data_ZIMM'
     checkpoint_prefix = os.path.join(checkpoint_dir, args.saved_model_name)
     checkpoint = tf.train.Checkpoint(generator_optimizer=generator_opt,
                                      discriminator_optimizer=discriminator_opt,
@@ -175,10 +176,10 @@ def main():
             y_sample = np.linspace(0., 1.0, num=NoT)
             y_sample_emb = np.transpose(np.tile(np.linspace(0., 1.0, num=NoT), (args.y_dim, 1))) * e_1
             y_sample_emb += np.transpose(np.tile((1 - np.linspace(0., 1.0, num=NoT)), (args.y_dim, 1))) * e_2
-            Z = sample_Z(x_data_test.shape[0], Z_dim)  # FNN
+            # Z = sample_Z(x_data_test.shape[0], Z_dim)  # FNN
 
-            x_gen = generator(tf.concat(axis=1, values=[Z, y_sample_emb]), training=False)  # FNN
-            # x_gen = generator(y_sample_emb, training=False)  #GMM
+            # x_gen = generator(tf.concat(axis=1, values=[Z, y_sample_emb]), training=False)  # FNN
+            x_gen = generator(y_sample_emb, training=False)  #GMM
 
             fig = plot_50genes(samples=x_gen.numpy(), real_samples=x_data_test)
             plt.savefig('output_files/' + args.output_fname + '/plots{}.png'.format(str(i).zfill(3)),
@@ -200,11 +201,11 @@ def main():
             #                                    batch_size)
             # discriminator_loss_i, total_loss_i = train_step_D_GP(X_mb, y_mb_emb, Z_dim, discriminator, generator,
             #                                                     discriminator_opt, batch_size, args.lam_gp, args.K_lip)
-            # discriminator_loss_i, total_loss_i = train_step_D_GP_GMM(X_mb, y_mb_emb, Z_dim, discriminator, generator,
-            #                                                          discriminator_opt, batch_size, args.lam_gp,
-            #                                                          args.K_lip, args.alpha)
-            discriminator_loss_i, total_loss_i = train_step_D_GP(X_mb, y_mb_emb, Z_dim, discriminator, generator,
-                                                                 discriminator_opt, batch_size, args.lam_gp, args.K_lip, args.alpha)
+            discriminator_loss_i, total_loss_i = train_step_D_GP_GMM(X_mb, y_mb_emb, Z_dim, discriminator, generator,
+                                                                     discriminator_opt, batch_size, args.lam_gp,
+                                                                     args.K_lip, args.alpha)
+            # discriminator_loss_i, total_loss_i = train_step_D_GP(X_mb, y_mb_emb, Z_dim, discriminator, generator,
+            #                                                      discriminator_opt, batch_size, args.lam_gp, args.K_lip, args.alpha)
 
         discriminator_losses.append(discriminator_loss_i)
         total_losses.append(total_loss_i)
@@ -213,7 +214,8 @@ def main():
         # generator_loss_i = train_step_G_GMM(y_mb_emb, Z_dim, discriminator, generator, generator_opt, batch_size)
         # generator_loss_i, _ = train_step_G_GMM_Spen(y_mb_emb, Z_dim, discriminator, generator, generator_opt,
         #                                             batch_size, args.spen, args.alpha)
-        generator_loss_i = train_step_G(y_mb_emb, Z_dim, discriminator, generator, generator_opt, batch_size, args.alpha)
+        # generator_loss_i = train_step_G(y_mb_emb, Z_dim, discriminator, generator, generator_opt, batch_size, args.alpha)
+        generator_loss_i = train_step_G_GMM(y_mb_emb, Z_dim, discriminator, generator, generator_opt, batch_size, args.alpha)
 
         generator_losses.append(generator_loss_i)
 
@@ -226,11 +228,14 @@ def main():
                                                                              (args.y_dim, 1))) * e_2]),
                                        training=False)
 
-            Z = sample_Z(x_data_test.shape[0], Z_dim)
-            D_fake_tmp = generator(tf.concat(axis=1, values=[Z,
-                                                             np.transpose(np.tile(y_data_test, (
-                                                                 args.y_dim, 1))) * e_1 + np.transpose(
-                                                                 np.tile(1. - y_data_test, (args.y_dim, 1))) * e_2]),
+            # Z = sample_Z(x_data_test.shape[0], Z_dim)
+            # D_fake_tmp = generator(tf.concat(axis=1, values=[Z,
+            #                                                  np.transpose(np.tile(y_data_test, (
+            #                                                      args.y_dim, 1))) * e_1 + np.transpose(
+            #                                                      np.tile(1. - y_data_test, (args.y_dim, 1))) * e_2]),
+            #                        training=False)
+            D_fake_tmp = generator(np.transpose(np.tile(y_data_test, (args.y_dim, 1))) * e_1
+                                   + np.transpose(np.tile(1. - y_data_test, (args.y_dim, 1))) * e_2,
                                    training=False)
 
             generator_loss_epoch = generator_cum_loss(D_fake_tmp, args.alpha)

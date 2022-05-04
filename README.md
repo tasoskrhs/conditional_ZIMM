@@ -15,14 +15,10 @@ and will install all required packages.
 * Download the data from:
 
 ## Train
-- ### Example 1:Train Lipschitz GAN using 2-D SwissRoll input data:
-``` python
-python main_swiss_LIP_GMM.py --steps=10000
-```
 
 ``` python
-python main_swiss_LIP_GMM.py --help
-usage: main_swiss_LIP_GMM.py [-h] [--data_fname] [--steps] [--d] [--mb] [--beta] [--gamma] 
+python main_example_name.py --help
+usage: main_example_name.py [-h] [--data_fname] [--steps] [--d] [--mb] [--beta] [--gamma] 
                              [--K] [--K_lip] [--lam_gp] [--Z_dim] [--y_dim] [--spen]
                              [--lr]  [--saved_model]
 
@@ -46,11 +42,12 @@ optional arguments:
 
 ```
 
+- ### Example 1:Train Lipschitz GAN using 2-D SwissRoll input data:
 
 Training has two options for the generator network:
 1. Train the network over a Swiss-Roll using conditional feedforward neural networks (cFNN):
-```
-python main_swiss_LIP.py 
+``` python
+python main_swiss_LIP.py  --steps=10000
 ```
 2. Train the network over a Swiss-Roll using conditional Gaussian Mixture Model (cGMM):
 ```
@@ -58,8 +55,16 @@ python main_swiss_LIP_GMM.py
 ```
 
 * ### Example 2: Synthetic mRNA-seq data
+1. Train the network over a Swiss-Roll using conditional feedforward neural networks (cFNN):
 ``` python
-python main_synth_data_LIP_GMM.py --steps=10000
+python main_synth_data_LIP.py --steps=100000
 ```
+2. Train the network over a Swiss-Roll using conditional zero-inflated Mixture Model (cZIMM):
+``` python
+python main_synth_data_LIP_ZIMM.py --steps=100000
+```
+
+* ### Example 3: Real mRNA-seq data
+
 
 ## Inference

@@ -1,7 +1,8 @@
-""" Losses for Generator and Discrinator"""
+""" Losses for Generator and Discriminator"""
 import tensorflow as tf
 
 
+#@tf.function
 def discriminator_cum_loss(D_real, D_fake, alpha=0.5):
     beta = 1 - alpha
     gamma = alpha
@@ -25,6 +26,7 @@ def discriminator_cum_loss(D_real, D_fake, alpha=0.5):
     return -D_loss # CHECK!!!!!!!!!!!!
 
 
+#@tf.function
 def generator_cum_loss(D_fake, alpha=0.5):
     gamma = alpha
 

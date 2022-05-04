@@ -103,7 +103,7 @@ def train_step_D_GP(x, y, Z_dim, discriminator, generator, d_optimizer, batch_si
         # compute GP
         gp = gradient_penalty(partial(discriminator, training=True),
                               x, G_sample, y, K, batch_size)
-        total_loss = discriminator_loss + lam_gp * gp  # re-check sign!
+        total_loss = discriminator_loss + lam_gp * gp
 
     # compute Gradients for discriminator
     grads_discriminator_loss = discriminator_tape.gradient(
@@ -119,7 +119,7 @@ def train_step_D_GP(x, y, Z_dim, discriminator, generator, d_optimizer, batch_si
     return discriminator_loss, total_loss
 
 
-# training of generator, which is a GMM
+# training of generator, which is a GMM (or ZIMM)
 @tf.function
 def train_step_G_GMM(y, Z_dim, discriminator, generator, g_optimizer, batch_size, alpha):
     with tf.GradientTape() as generator_tape:
@@ -144,7 +144,7 @@ def train_step_G_GMM(y, Z_dim, discriminator, generator, g_optimizer, batch_size
     return generator_loss
 
 
-# training of discriminator, generator is a GMM
+# training of discriminator, generator is a GMM (or ZIMM)
 @tf.function
 def train_step_D_GP_GMM(x, y, Z_dim, discriminator, generator, d_optimizer, batch_size, lam_gp, K, alpha):
     with tf.GradientTape() as discriminator_tape:
@@ -194,7 +194,7 @@ def train_step_G_GMM_Spen(y, Z_dim, discriminator, generator, g_optimizer, batch
                     tf.linalg.diag_part(  # for taking the K diagonals of a tensor of shape (K, X_dim, X_dim)
                         tf.matmul(generator.G_S, generator.G_S, transpose_b=True)), [-1]))
         )
-        generator_total_loss = generator_loss + spen * sig_loss  # re-check sign!
+        generator_total_loss = generator_loss + spen * sig_loss
 
     # compute Gradients for generator
     grads_generator_loss = generator_tape.gradient(
