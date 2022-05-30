@@ -76,3 +76,24 @@ def plot_50genes(samples, real_samples,  scale=16.5):
         plt.ylim(0, 1.0)
 
     return fig
+
+
+# 16-D marginal histograms (used in Real dataset)
+def plot_16genes(samples, real_samples,  scale=10.0):
+    fig = plt.figure(figsize=(60, 60))
+    gs = gridspec.GridSpec(1, 1)
+    gs.update(wspace=0.5, hspace=0.5)
+    edges = np.concatenate(([-10], np.arange(-0.5, 16, 0.5), [20]), axis=0)
+
+    for i in range(16):
+        plt.subplot(4, 4, i+1)
+        plt.hist(real_samples[:, i], edges, weights=np.ones(len(real_samples[:, i])) / len(real_samples[:, i]), density=False, alpha=0.5, facecolor='b') # normed! as in matlab
+        plt.title('gene = %i' % i) # plt.title('iter = %i' % it)
+        # the histogram of the data
+        plt.hist(samples[:, i], edges, weights=np.ones(len(samples[:, i])) / len(samples[:, i]), density=False, alpha=0.5, facecolor='g') # normed! as in matlab
+
+        plt.xlim(-1.0, scale)
+        plt.ylim(0, 1.0)
+
+    return fig
+

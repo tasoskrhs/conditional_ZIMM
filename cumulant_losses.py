@@ -23,7 +23,7 @@ def discriminator_cum_loss(D_real, D_fake, alpha=0.5):
 
     D_loss = D_loss_real - D_loss_fake
 
-    return -D_loss # CHECK!!!!!!!!!!!!
+    return -D_loss
 
 
 #@tf.function

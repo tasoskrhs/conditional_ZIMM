@@ -12,15 +12,16 @@ and will install all required packages.
 `. ./setup.sh`
 
 ## Preparation
-* Download the data from:
+* Download input data from:
 
-## Train
+## Training
 
 ``` python
 python main_example_name.py --help
 usage: main_example_name.py [-h] [--data_fname] [--steps] [--d] [--mb] [--beta] [--gamma] 
                              [--K] [--K_lip] [--lam_gp] [--Z_dim] [--y_dim] [--spen]
-                             [--lr]  [--saved_model]
+                             [--lr]  [--saved_model] [--output_fname] [--resume_from_iter]
+                             [--missing_labels]
 
 
 optional arguments:
@@ -39,32 +40,40 @@ optional arguments:
   --lr                  learning rate (default: 0.0002)
   --saved_model         name of the saved model checkpoints
   --output_fname        name of the output file directory, for this experiment
-
+  --resume_from_iter    steps corresponding to last checkpoint, needed to resume training
+  --missing_labels      Missing labeled data in the training set. Options: 'none' (default), '0.4_0.6', 'state_2'
 ```
 
-- ### Example 1:Train Lipschitz GAN using 2-D SwissRoll input data:
+- ### Example 1: Train Lipschitz GAN using a 2-D SwissRoll dataset
 
-Training has two options for the generator network:
-1. Train the network over a Swiss-Roll using conditional feedforward neural networks (cFNN):
+We provide two options for the generator network:
+1. Train using the conditional feedforward neural network (cFNN) generator for 100K steps:
 ``` python
-python main_swiss_LIP.py  --steps=10000
+python main_swiss_LIP.py  --steps 100000
 ```
-2. Train the network over a Swiss-Roll using conditional Gaussian Mixture Model (cGMM):
+2. Train using the conditional Gaussian Mixture Model (cGMM) generator and sigma penalty to be 0.0003:
 ```
-python main_swiss_LIP_GMM.py 
+python main_swiss_LIP_GMM.py -spen 0.0003
 ```
 
-* ### Example 2: Synthetic mRNA-seq data
-1. Train the network over a Swiss-Roll using conditional feedforward neural networks (cFNN):
+* ### Example 2: Synthetic RNA-seq data
+1. Train using the conditional feedforward neural network (cFNN) generator with gating on the output layer. Training data labels lie uniformly in [0, 1]:
 ``` python
-python main_synth_data_LIP.py --steps=100000
+python main_synth_data_LIP.py --steps 200000 --missing_labels none
 ```
-2. Train the network over a Swiss-Roll using conditional zero-inflated Mixture Model (cZIMM):
+2. Train using the conditional zero-inflated Mixture Model (cZIMM) generator, where state 2 is missing from the training data:
 ``` python
-python main_synth_data_LIP_ZIMM.py --steps=100000
+python main_synth_data_LIP_ZIMM.py --missing_labels state_2
 ```
 
-* ### Example 3: Real mRNA-seq data
-
+* ### Example 3: Real single-cell mass cytometry data
+1. Train using the conditional feedforward neural network (cFNN) generator with gating on the output layer. Here we have continue training from a previous run of 100K steps for another 200K steps:
+``` python
+python main_real_data_LIP.py --steps 300000 --resume_from_iter 100000
+```
+2. Train using the conditional zero-inflated Mixture Model (cZIMM) generator:
+``` python
+python main_real_data_LIP_ZIMM.py 
+```
 
 ## Inference

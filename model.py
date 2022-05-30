@@ -48,24 +48,24 @@ def FNN_generator(noise_dim, y_dim, units_list=[32, 32, 1]):
 
 
 # variant of FNN using gating on the output layer
-def FNN_Gated_generator(noise_dim, y_dim, units_list=[32, 32, 1]):
+def FNN_Gated_generator(noise_dim, y_dim, units_list=[32, 32, 50]):
     # define the model input and first dense module
     inputs = keras.Input(shape=(noise_dim + y_dim,))
     dense = layers.Dense(units_list[0], activation="relu", name="layer_0")  # first hidden
     x = dense(inputs)
 
     # remaining dense layers
-    #for i, units in enumerate(units_list[1:-2], start=1):
-    #    x = layers.Dense(units, activation="relu", name="layer_%i" % i)(x)
-    x_relu = layers.Dense(units_list[1], activation="relu", name="layer_1")(x)
+    for i, units in enumerate(units_list[1:-1], start=1):
+        x = layers.Dense(units, activation="relu", name="layer_%i" % i)(x)
 
-    # Gating layer
-    x_g = layers.Dense(units_list[1], activation="sigmoid", name="gated_layer")(x)
+    # ouput layer: linear component
+    x_lin = layers.Dense(units_list[-1], name="lin_layer")(x)
+
+    # ouput layer: Gating component
+    x_g = layers.Dense(units_list[-1], activation="sigmoid", name="gated_layer")(x)
 
     # output layer
-    x = layers.Dense(units_list[-1], name="out_layer")(x_relu * x_g)
-
-    outputs = x
+    outputs = x_lin * x_g
 
     # create the model
     model = keras.Model(inputs=inputs, outputs=outputs, name="Gated_generator")
@@ -84,21 +84,7 @@ class GMM_generator(layers.Layer):
         self.W_gm = tf.Variable(initial_value=tf.zeros(shape=[K, y_dim, X_dim]), trainable=True)
         self.W_gw = tf.Variable(initial_value=tf.zeros(shape=[y_dim, K]), trainable=True)
         self.b_gw = tf.Variable((1 / K) * tf.ones(shape=[K]), trainable=True)
-        self.G_S = tf.Variable(np.stack((np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f'),
-                                         np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f'),
-                                         np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f'),
-                                         np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f'),
-                                         np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f'),
-                                         np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f'),
-                                         np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f'),
-                                         np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f'),
-                                         np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f'),
-                                         np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f'),
-                                         np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f'),
-                                         np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f'),
-                                         np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f'),
-                                         np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f'),
-                                         np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f'))
+        self.G_S = tf.Variable(np.stack([np.identity(X_dim, dtype='f') for _ in range(K)]
                                         , axis=0)
                                , trainable=True)
 
@@ -156,38 +142,25 @@ class GMM_generator(layers.Layer):
 
 # conditional ZIMM generator
 class ZIMM_generator(layers.Layer):
-    def __init__(self, X_dim, y_dim, K):
+    def __init__(self, X_dim, y_dim, K, clusters=None):
         super(ZIMM_generator, self).__init__()
         self.K = K
         self.X_dim = X_dim
-        self.e_s = 300  # 200 # 100 # 0.01 #eps in sigmoid steepness, c is shift i.e 1/(1+e^{-e_s(x-c)})
+        self.e_s = 300  # 200 # 100 #eps in sigmoid steepness, c is shift i.e 1/(1+e^{-e_s(x-c)})
 
         self.W_gm = tf.Variable(initial_value=tf.zeros(shape=[K, y_dim, X_dim]), trainable=True)
         self.W_gw = tf.Variable(initial_value=tf.zeros(shape=[y_dim, K]), trainable=True)
         self.b_gw = tf.Variable((1 / K) * tf.ones(shape=[K]), trainable=True)
-        self.G_S = tf.Variable(np.stack((np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f'),
-                                         np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f'),
-                                         np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f'),
-                                         np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f'),
-                                         np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f'),
-                                         np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f'),
-                                         np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f'),
-                                         np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f'),
-                                         np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f'),
-                                         np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f')
-                                         # np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f'),
-                                         # np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f'),
-                                         # np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f'),
-                                         # np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f'),
-                                         # np.identity(X_dim, dtype='f'), np.identity(X_dim, dtype='f')
-                                         ),
+        self.G_S = tf.Variable(np.stack([np.identity(X_dim, dtype='f') for _ in range(K)],
                                         axis=0)
                                , trainable=True)
 
         # initialize for faster training using K-means
+        if clusters is not None:
+            self.b_gm = tf.Variable(clusters.astype('f'))
+        else:
+            self.b_gm = tf.Variable((tf.random.normal(shape=[K, X_dim], mean=0., stddev=1)))
 
-
-        self.b_gm = tf.Variable((tf.random.normal(shape=[K, X_dim], mean=0., stddev=1)))
         self.G_a = tf.Variable(tf.random.uniform(shape=[K, X_dim], minval=0.0, maxval=1.0))
 
     @tf.function

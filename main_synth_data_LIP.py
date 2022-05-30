@@ -3,8 +3,10 @@
 import argparse
 import tensorflow as tf
 import numpy as np
+from numpy import genfromtxt
 import os
 import matplotlib.pyplot as plt
+import csv
 
 from model import FNN_Gated_generator, FNN_discriminator
 from data_loading import load_synth_data
@@ -87,15 +89,23 @@ def parse_args():
     parser.add_argument(
         '--output_fname', dest='output_fname',
         help='name of the output file directory, for this experiment',
-        type=str, default='plots_cond_cond_GATING_uniform'
+        type=str, default='plots_synth_data_cFNN'
+    )
+    parser.add_argument(
+        '--resume_from_iter', dest='resume_from_iter',
+        help='steps corresponding to last checkpoint, needed to resume training',
+        type=int, default=0
+    )
+    parser.add_argument(
+        '--missing_labels', dest='missing_labels',
+        help='Missing labeled data in the training set. Options: none or 0.4_0.6 or state_2',
+        type=str, default='none'
     )
 
     return parser.parse_args()
 
 
 """ Unit tests """
-
-
 def test_1():
     assert sum((1, 2, 3)) == 6, "Should be 6"
 
@@ -111,50 +121,87 @@ def main():
         raise ValueError("Invalid batch size")
     if args.steps <= 0:
         raise ValueError("Invalid number of steps")
+    if args.steps <= args.resume_from_iter:
+        raise ValueError("Invalid iteration to resume from. It should be smaller than STEPS")
 
     NoT = 3000  # Number of generated, see later
 
     # load data
-    x_data_train, y_data_train, x_data_test, y_data_test = load_synth_data(args.data_fname, NoTest=NoT)
+    x_data_train, y_data_train, x_data_test, y_data_test = load_synth_data(args.data_fname, NoTest=NoT, missing_labels=args.missing_labels)
 
     # Set the model up
     discriminator = FNN_discriminator(data_dim=args.d, y_dim=args.y_dim, units_list=[32, 32, 1])
     print(discriminator.summary())  # Functional model
 
     # generator = FNN_generator(noise_dim=args.Z_dim, y_dim=args.y_dim, units_list=[32, 32, args.d])
-    # print(generator.summary())
-    # generator = GMM_generator(X_dim=args.d, y_dim=args.y_dim, mb_size=args.mb_size, K=args.K) # as a regular function..
-    # generator = GMM_generator(X_dim=args.d, y_dim=args.y_dim, mb_size=args.mb_size, K=args.K)  # as a class declaration
     generator = FNN_Gated_generator(noise_dim=args.Z_dim, y_dim=args.y_dim, units_list=[32, 32, args.d])
-    print('instantiated generator...')
-    # print(generator(tf.ones((10, args.y_dim))))
+    print(generator.summary())  # Functional model
 
-    discriminator_opt = tf.keras.optimizers.Adam(learning_rate=args.lr)
-    generator_opt = tf.keras.optimizers.Adam(learning_rate=args.lr)
+    discriminator_opt = tf.keras.optimizers.Adam(learning_rate=args.lr, epsilon=1e-8)
+    generator_opt = tf.keras.optimizers.Adam(learning_rate=args.lr, epsilon=1e-8)
 
     # Save checkpoints
-    if not os.path.exists('./training_checkpoints_synth_data_FNN'):
-        os.makedirs('./training_checkpoints_synth_data_FNN')
+    if not os.path.exists('./training_checkpoints_synth_data_cFNN'):
+        os.makedirs('./training_checkpoints_synth_data_cFNN')
 
-    checkpoint_dir = './training_checkpoints_synth_data_FNN'
+    checkpoint_dir = './training_checkpoints_synth_data_cFNN'
     checkpoint_prefix = os.path.join(checkpoint_dir, args.saved_model_name)
     checkpoint = tf.train.Checkpoint(generator_optimizer=generator_opt,
                                      discriminator_optimizer=discriminator_opt,
                                      generator=generator,
                                      discriminator=discriminator)
 
+    # load checkpoints
+    if args.resume_from_iter > 0:
+        checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir)).expect_partial() #.assert_consumed()
+        print("Found checkpoint, resuming from iter: ", args.resume_from_iter)
+        # Load previously chosen input data!
+        x_data_test = genfromtxt(checkpoint_dir + '/x_data_test.csv', delimiter=',', dtype='float32')
+        x_data_train = genfromtxt(checkpoint_dir + '/x_data_train.csv', delimiter=',', dtype='float32')
+
+        NoT = x_data_test.shape[0]
+        y_data_test = genfromtxt(checkpoint_dir + '/y_data_test.csv', dtype='float32')
+        y_data_test = np.ravel(y_data_test) #np.reshape(y_data_test, (NoT, -1))
+        y_data_train = genfromtxt(checkpoint_dir + '/y_data_train.csv', dtype='float32')
+        y_data_train = np.ravel(y_data_train) #np.reshape(y_data_train, (y_data_train.shape[0],-1))
+    else:
+        # save data for further training from checkpoint
+        with open(checkpoint_dir + '/x_data_test.csv', "w") as output:
+            writer = csv.writer(output, lineterminator='\n')
+            for val in x_data_test:
+                writer.writerow(val)
+
+        with open(checkpoint_dir + '/x_data_train.csv', "w") as output:
+            writer = csv.writer(output, lineterminator='\n')
+            for val in x_data_train:
+                writer.writerow(val)
+
+        with open(checkpoint_dir + '/y_data_test.csv', "w") as output:
+            writer = csv.writer(output, lineterminator='\n')
+            y_data_test_ = np.reshape(y_data_test, (NoT, -1))  # undo np.ravel()
+            for val in y_data_test_:
+                writer.writerow(val)
+
+        with open(checkpoint_dir + '/y_data_train.csv', "w") as output:
+            writer = csv.writer(output, lineterminator='\n')
+            y_data_train_ = np.reshape(y_data_train, (y_data_train.shape[0], -1))  # undo np.ravel()
+            for val in y_data_train_:
+                writer.writerow(val)
+
     if not os.path.exists('./output_files'):
         os.makedirs('./output_files')
     if not os.path.exists('./output_files/' + args.output_fname):
         os.makedirs('./output_files/' + args.output_fname)
+    if not os.path.exists('./output_files/' + args.output_fname + '/csv'):
+        os.makedirs('./output_files/' + args.output_fname + '/csv')
 
     ####################
     #  Training
     ####################
 
-    steps_per_print = 500
+    steps_per_print = 100
     k = 5
-    SF = 1000
+    SF = 100
     batch_size = args.mb_size
     Z_dim = args.Z_dim
     discriminator_losses = []
@@ -162,17 +209,16 @@ def main():
     total_losses = []
 
     np.random.seed(0)  # fix seed
-
+    # embedding vectors
     e_1 = np.ones(shape=(1, args.y_dim), dtype=np.float32)
     e_2 = -np.ones(shape=(1, args.y_dim), dtype=np.float32)
 
-    # run training without compiling
-    for i in range(args.steps):
+    for i in range(args.resume_from_iter, args.steps):
 
         if i % SF == 0:
-            # generate data for plotting
+            # generate data for plotting and saving
             print('plot generated data')
-            y_sample = np.linspace(0., 1.0, num=NoT)
+            # y_sample = np.linspace(0., 1.0, num=NoT)
             y_sample_emb = np.transpose(np.tile(np.linspace(0., 1.0, num=NoT), (args.y_dim, 1))) * e_1
             y_sample_emb += np.transpose(np.tile((1 - np.linspace(0., 1.0, num=NoT)), (args.y_dim, 1))) * e_2
             Z = sample_Z(x_data_test.shape[0], Z_dim)  # FNN
@@ -186,6 +232,13 @@ def main():
                         format='png', dpi=100)
             plt.close(fig)
 
+            with open('output_files/' + args.output_fname + '/csv/cond_FNN_LIP_samples_alpha_' + str(args.alpha)
+                      + '_iteration_' + str(i) + '.csv', "w") as output:
+                writer = csv.writer(output, lineterminator='\n')
+                x_gen_ = x_gen.numpy() # convert tensor to numpy array
+                for val in x_gen_:
+                    writer.writerow(val)
+
         for j in range(k):
             # update discriminator
             idx = np.random.randint(x_data_train.shape[0], size=batch_size)
@@ -194,7 +247,7 @@ def main():
 
             # embedded labels
             y_mb_emb = np.transpose(np.tile(y_mb, (args.y_dim, 1))) * e_1 + \
-                       np.transpose(np.tile(1. - y_mb, (args.y_dim, 1))) * e_2  # CHECK!
+                       np.transpose(np.tile(1. - y_mb, (args.y_dim, 1))) * e_2
 
             # discriminator_loss_i = train_step_D(X_mb, y_mb_emb, Z_dim, discriminator, generator, discriminator_opt,
             #                                    batch_size)
@@ -241,7 +294,7 @@ def main():
                   )
 
         # Save the model every 1000 steps
-        if (i + 1) % 1000 == 0:
+        if (i + 1) % 500 == 0:
             checkpoint.save(file_prefix=checkpoint_prefix)
 
     # plot Losses during steps (over mini-batches)
