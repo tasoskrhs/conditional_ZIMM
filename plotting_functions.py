@@ -4,8 +4,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
-# 2-D plot (used in SwissRoll dataset)
+
 def plot_color(samples, y_labels, X_mb, scale, titl):
+    """
+        2-D plot (used in SwissRoll dataset)
+    :param samples: generated data
+    :param y_labels: labels of the samples
+    :param X_mb: test data (plotted in black as reference)
+    :param scale: axis scales (float)
+    :param titl: title of the plot
+    :return: matplotlib figure instance
+    """
     fig = plt.figure(figsize=(5, 5))
     gs = gridspec.GridSpec(1, 1)
     gs.update(wspace=0.5, hspace=0.5)
@@ -56,14 +65,18 @@ def plot_losses_over_steps(D_loss_plots, G_loss_plots, save_fname, alpha):
     plt.close(fig)
 
 
-# 50-D marginal histograms (used in Synthetic dataset)
 def plot_50genes(samples, real_samples,  scale=16.5):
+    """
+            50-D marginal histograms (used in Synthetic dataset)
+    :param samples: generated samples (plotted in green)
+    :param real_samples: test data (plotted in blue as reference)
+    :param scale: axis scales (float)
+    :return: matplotlib figure instance
+    """
     fig = plt.figure(figsize=(90, 40))
     gs = gridspec.GridSpec(1, 1)
     gs.update(wspace=0.5, hspace=0.5)
     edges = np.concatenate(([-10], np.arange(-0.5, 16, 0.5), [20]), axis=0) # [-1, 0:0.5:16, 20]
-
-    # samples_LOC = samples.numpy()
 
     for i in range(50):
         plt.subplot(5, 10, i+1)
@@ -78,8 +91,14 @@ def plot_50genes(samples, real_samples,  scale=16.5):
     return fig
 
 
-# 16-D marginal histograms (used in Real dataset)
 def plot_16genes(samples, real_samples,  scale=10.0):
+    """
+        16-D marginal histograms (used in Real dataset)
+    :param samples: generated samples (plotted in green)
+    :param real_samples: test data (plotted in blue as reference)
+    :param scale: axis scales (float)
+    :return: matplotlib figure instance
+    """
     fig = plt.figure(figsize=(60, 60))
     gs = gridspec.GridSpec(1, 1)
     gs.update(wspace=0.5, hspace=0.5)

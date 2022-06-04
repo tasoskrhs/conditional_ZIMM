@@ -1,12 +1,18 @@
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
-from tensorflow.keras.utils import plot_model
 import numpy as np
 
 
 # Feedforward NN (Functional model type)
 def FNN_discriminator(data_dim, y_dim, units_list=[32, 32, 1]):
+    """
+             Feedforward NN (Functional model type)
+    :param data_dim: data dimensions (int)
+    :param y_dim: label dimensions after embedding (int)
+    :param units_list: NN layers
+    :return: instance of the model
+    """
     # define the model input and first dense module
     inputs = keras.Input(shape=(data_dim + y_dim,))
     dense = layers.Dense(units_list[0], activation="relu", name="layer_0")  # first hidden
@@ -27,6 +33,13 @@ def FNN_discriminator(data_dim, y_dim, units_list=[32, 32, 1]):
 
 
 def FNN_generator(noise_dim, y_dim, units_list=[32, 32, 1]):
+    """
+        Feedforward NN (Functional model type)
+    :param noise_dim: noise dimensions (int)
+    :param y_dim: label dimensions after embedding (int)
+    :param units_list: NN layers
+    :return: instance of the model
+    """
     # define the model input and first dense module
     inputs = keras.Input(shape=(noise_dim + y_dim,))
     dense = layers.Dense(units_list[0], activation="relu", name="layer_0")  # first hidden
@@ -47,8 +60,14 @@ def FNN_generator(noise_dim, y_dim, units_list=[32, 32, 1]):
     return model
 
 
-# variant of FNN using gating on the output layer
 def FNN_Gated_generator(noise_dim, y_dim, units_list=[32, 32, 50]):
+    """
+        variant of FNN using Gating on the output layer
+    :param noise_dim: noise dimensions (int)
+    :param y_dim: label dimensions after embedding (int)
+    :param units_list:  NN layers
+    :return: instance of the model
+    """
     # define the model input and first dense module
     inputs = keras.Input(shape=(noise_dim + y_dim,))
     dense = layers.Dense(units_list[0], activation="relu", name="layer_0")  # first hidden
@@ -72,15 +91,18 @@ def FNN_Gated_generator(noise_dim, y_dim, units_list=[32, 32, 50]):
 
     return model
 
-# conditional GMM generator
+
 class GMM_generator(layers.Layer):
+    """
+        conditional GMM generator
+    """
     def __init__(self, X_dim, y_dim, K):
         super(GMM_generator, self).__init__()
         self.K = K
         self.X_dim = X_dim
         self.e_s = 300  # 200 # 100 # 0.01 #eps in sigmoid steepness, c is shift i.e 1/(1+e^{-e_s(x-c)})
 
-        # initialize for faster training on SwissRoll
+        # initialize for faster training on SwissRoll dataset
         self.W_gm = tf.Variable(initial_value=tf.zeros(shape=[K, y_dim, X_dim]), trainable=True)
         self.W_gw = tf.Variable(initial_value=tf.zeros(shape=[y_dim, K]), trainable=True)
         self.b_gw = tf.Variable((1 / K) * tf.ones(shape=[K]), trainable=True)
@@ -140,8 +162,11 @@ class GMM_generator(layers.Layer):
         return out
 
 
-# conditional ZIMM generator
+
 class ZIMM_generator(layers.Layer):
+    """
+        conditional ZIMM generator
+    """
     def __init__(self, X_dim, y_dim, K, clusters=None):
         super(ZIMM_generator, self).__init__()
         self.K = K

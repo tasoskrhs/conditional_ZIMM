@@ -1,15 +1,21 @@
 # GAN-based Training of Semi-Interpretable Generators for Biological Data Interpolation and Augmentation
 ## authors: Anastasios Tsourtis, Georgios Papoutsoglou, Yannis Pantazis
 
-### Paper: [website_name.com](https://uoc.gr)
+### Paper: [https://doi.org/10.3390/app12115434](https://www.mdpi.com/2076-3417/12/11/5434/htm)
 This repository hosts the official TensorFlow implementation of our paper, 
-accepted at MDPI.
+published at MDPI.
 
 ## Environment Setup
-After cloning the repository run (while sourcing it) `setup.sh`, this will create and activate a python 3.6 environment called **tf2_env_py36** using conda 
-and will install all required packages.
+We assume that conda is already installed on your system.
+After cloning the repository run `setup.sh` script (while sourcing it): 
 
 `. ./setup.sh`
+
+It will create and activate a python 3.9 environment called **tf2_env_py39** using conda 
+and will install all required packages.
+
+
+Please refer to https://www.tensorflow.org/install/pip#linux_1 for more information on how to set up TensorFlow with GPU acceleration.
 
 ## Preparation
 * Download input data from:
@@ -51,9 +57,9 @@ We provide two options for the generator network:
 ``` python
 python main_swiss_LIP.py  --steps 100000
 ```
-2. Train using the conditional Gaussian Mixture Model (cGMM) generator and sigma penalty to be 0.0003:
+2. Train using the conditional Gaussian Mixture Model (cGMM) generator and sigma penalty coefficient to be 0.002:
 ```
-python main_swiss_LIP_GMM.py -spen 0.0003
+python main_swiss_LIP_GMM.py -spen 0.002
 ```
 
 * ### Example 2: Synthetic RNA-seq data
@@ -61,9 +67,9 @@ python main_swiss_LIP_GMM.py -spen 0.0003
 ``` python
 python main_synth_data_LIP.py --steps 200000 --missing_labels none
 ```
-2. Train using the conditional zero-inflated Mixture Model (cZIMM) generator, where state 2 is missing from the training data:
+2. Train using the conditional zero-inflated Mixture Model (cZIMM) generator, where interval [0.4:0.6] is missing from the training data set:
 ``` python
-python main_synth_data_LIP_ZIMM.py --missing_labels state_2
+python main_synth_data_LIP_ZIMM.py --missing_labels 0.4_0.6
 ```
 
 * ### Example 3: Real single-cell mass cytometry data

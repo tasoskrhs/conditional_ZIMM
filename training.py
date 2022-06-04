@@ -6,6 +6,19 @@ from cumulant_losses import discriminator_cum_loss, generator_cum_loss
 
 @tf.function  # "compile" this function (for graph execution and faster performance)
 def train_step_G(y, Z_dim, discriminator, generator, g_optimizer, batch_size, alpha):
+    """
+        optimize for the Generator NN
+    :param y: embedded labels (batch_size, y_dim)
+    :param Z_dim: noise dimension
+    :param discriminator: discriminator model instance
+    :param generator: generator model instance
+    :param g_optimizer: generator optimizer instance
+    :param batch_size: (int)
+    :param alpha: Renyi divergence hyper-parameter (float)
+    :return: generator part of the loss after optimization (tensor)
+    """
+
+    # sample noise for the Generator input
     Z = sample_Z(batch_size, Z_dim)
 
     with tf.GradientTape() as generator_tape:
@@ -32,6 +45,18 @@ def train_step_G(y, Z_dim, discriminator, generator, g_optimizer, batch_size, al
 
 @tf.function
 def train_step_D(x, y, Z_dim, discriminator, generator, d_optimizer, batch_size, alpha):
+    """
+        optimize for Discriminator without Gradient Penalty
+    :param x: training data (batch_size, X_dim)
+    :param y: embedded labels (batch_size, y_dim)
+    :param Z_dim: noise dimension
+    :param discriminator: discriminator model instance
+    :param generator: generator model instance
+    :param d_optimizer: discriminator optimizer instance
+    :param batch_size: (int)
+    :param alpha: Renyi divergence hyper-parameter (float)
+    :return: discriminator part of the loss after optimization (tensor)
+    """
     Z = sample_Z(batch_size, Z_dim)
 
     with tf.GradientTape() as discriminator_tape:
@@ -67,28 +92,52 @@ def sample_Z(m, n):
 ##########################################
 @tf.function
 def gradient_penalty(discriminator, x, G_sample, y, K, mb_size):
-    alpha_gp = tf.random.uniform(shape=[mb_size, 1], minval=0., maxval=1., dtype=tf.float32)  # <-- check for float64
+    """
+        Gradient Penalty. See paper https://arxiv.org/abs/1704.00028
+
+    :param discriminator: discriminator model instance
+    :param x: training data (batch_size, X_dim)
+    :param G_sample: generated data
+    :param y: embedded labels (batch_size, y_dim)
+    :param K: Lipschitz constant
+    :param mb_size: (int)
+    :return: Gradient Penalty (tensor)
+    """
+    alpha_gp = tf.random.uniform(shape=[mb_size, 1], minval=0., maxval=1., dtype=tf.float32)
     inter = x + (alpha_gp * (G_sample - x))
 
     with tf.GradientTape() as tape:
         tape.watch(inter)
-        # predictions = discriminator(inter)
         predictions = discriminator(tf.concat(axis=1, values=[inter, y]))
 
     gradients = tape.gradient(predictions, [inter])[
-        0]  # <-- CHECK! if predictions are correct above... compare with tf1
-    slopes = tf.sqrt(tf.reduce_sum(tf.square(gradients), axis=1))  # <-- fixed axis, check
+        0]
+    slopes = tf.sqrt(tf.reduce_sum(tf.square(gradients), axis=1))
     gradient_pen = tf.reduce_mean(
-        tf.math.maximum(tf.zeros([slopes.shape[0]], dtype=tf.float32), (slopes - K)) ** 2)  # two-sided
-    # typecast check!
+        tf.math.maximum(tf.zeros([slopes.shape[0]], dtype=tf.float32), (slopes - K)) ** 2)  # two-sided penalty
+
     gradient_pen = tf.dtypes.cast(gradient_pen, tf.float32)
 
     return gradient_pen
 
 
-# use Gradient Penalty on the total loss...
 @tf.function
 def train_step_D_GP(x, y, Z_dim, discriminator, generator, d_optimizer, batch_size, lam_gp, K, alpha):
+    """
+         optimize for Discriminator using Gradient Penalty
+
+    :param x: training data (batch_size, X_dim)
+    :param y: embedded labels (batch_size, y_dim)
+    :param Z_dim: noise dimension
+    :param discriminator: discriminator model instance
+    :param generator: generator model instance
+    :param d_optimizer: discriminator optimizer instance
+    :param batch_size: (int)
+    :param lam_gp: Gradient Penalty coefficient (float)
+    :param K: Lipschitz constant
+    :param alpha: Renyi divergence hyper-parameter (float)
+    :return: discriminator part of the loss after optimization (tensor), discriminator loss plus GP loss (tensor)
+    """
     Z = sample_Z(batch_size, Z_dim)
 
     with tf.GradientTape() as discriminator_tape:
@@ -119,9 +168,20 @@ def train_step_D_GP(x, y, Z_dim, discriminator, generator, d_optimizer, batch_si
     return discriminator_loss, total_loss
 
 
-# training of generator, which is a GMM (or ZIMM)
 @tf.function
 def train_step_G_GMM(y, Z_dim, discriminator, generator, g_optimizer, batch_size, alpha):
+    """
+     optimize for Generator, which is a GMM (or ZIMM)
+
+    :param y: embedded labels (batch_size, y_dim)
+    :param Z_dim: noise dimension
+    :param discriminator: discriminator model instance
+    :param generator: generator model instance
+    :param g_optimizer: generator optimizer instance
+    :param batch_size: (int)
+    :param alpha: Renyi divergence hyper-parameter (float)
+    :return: generator part of the loss after optimization (tensor)
+    """
     with tf.GradientTape() as generator_tape:
         # build model
         G_sample = generator(y, training=True)
@@ -144,9 +204,24 @@ def train_step_G_GMM(y, Z_dim, discriminator, generator, g_optimizer, batch_size
     return generator_loss
 
 
-# training of discriminator, generator is a GMM (or ZIMM)
 @tf.function
 def train_step_D_GP_GMM(x, y, Z_dim, discriminator, generator, d_optimizer, batch_size, lam_gp, K, alpha):
+    """
+     optimize for Discriminator, generator is a GMM (or ZIMM), using gradient penalty
+
+    :param x: training data (batch_size, X_dim)
+    :param y: embedded labels (batch_size, y_dim)
+    :param Z_dim: noise dimension
+    :param discriminator: discriminator model instance
+    :param generator: generator model instance
+    :param d_optimizer: discriminator optimizer instance
+    :param batch_size: (int)
+    :param lam_gp: Gradient Penalty coefficient (float)
+    :param K: Lipschitz constant
+    :param alpha: Renyi divergence hyper-parameter (float)
+    :return: discriminator part of the loss after optimization (tensor), discriminator loss plus GP loss (tensor)
+    """
+
     with tf.GradientTape() as discriminator_tape:
         # build model
         D_real = discriminator(tf.concat(axis=1, values=[x, y]), training=True)
@@ -175,9 +250,19 @@ def train_step_D_GP_GMM(x, y, Z_dim, discriminator, generator, d_optimizer, batc
     return discriminator_loss, total_loss
 
 
-# training of generator, which is a GMM. Sigma Penalty
 @tf.function
 def train_step_G_GMM_Spen(y, Z_dim, discriminator, generator, g_optimizer, batch_size, spen, alpha):
+    """ training of generator, which is a GMM. We are using Sigma Penalty on the Variance matrices of the Gaussians
+    :param y: embedded labels (batch_size, y_dim)
+    :param Z_dim: noise dimension
+    :param discriminator: discriminator model instance
+    :param generator: generator model instance
+    :param g_optimizer:  generator optimizer instance
+    :param batch_size: (int)
+    :param spen: sigma penalty coefficient (flaot)
+    :param alpha: Renyi divergence hyper-parameter (float)
+    :return: generator part of the loss after optimization (tensor)
+    """
     with tf.GradientTape() as generator_tape:
         # build model
         G_sample = generator(y, training=True)

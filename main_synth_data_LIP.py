@@ -105,18 +105,13 @@ def parse_args():
     return parser.parse_args()
 
 
-""" Unit tests """
-def test_1():
-    assert sum((1, 2, 3)) == 6, "Should be 6"
-
-
 def main():
     args = parse_args()
 
     # Check inputs.
     print(args.data_fname)
     if not os.path.exists(args.data_fname):
-        raise FileNotFoundError("Input data file does not exist")
+        raise FileNotFoundError("Input data does not exist")
     if args.mb_size <= 0:
         raise ValueError("Invalid batch size")
     if args.steps <= 0:
@@ -127,13 +122,13 @@ def main():
     NoT = 3000  # Number of generated, see later
 
     # load data
-    x_data_train, y_data_train, x_data_test, y_data_test = load_synth_data(args.data_fname, NoTest=NoT, missing_labels=args.missing_labels)
+    x_data_train, y_data_train, x_data_test, y_data_test = load_synth_data(args.data_fname, NoTest=NoT,
+                                                                           missing_labels=args.missing_labels)
 
-    # Set the model up
+    # Set the model up, units_list is the architecture of the layers
     discriminator = FNN_discriminator(data_dim=args.d, y_dim=args.y_dim, units_list=[32, 32, 1])
     print(discriminator.summary())  # Functional model
 
-    # generator = FNN_generator(noise_dim=args.Z_dim, y_dim=args.y_dim, units_list=[32, 32, args.d])
     generator = FNN_Gated_generator(noise_dim=args.Z_dim, y_dim=args.y_dim, units_list=[32, 32, args.d])
     print(generator.summary())  # Functional model
 
@@ -153,7 +148,7 @@ def main():
 
     # load checkpoints
     if args.resume_from_iter > 0:
-        checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir)).expect_partial() #.assert_consumed()
+        checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir)).expect_partial()  # .assert_consumed()
         print("Found checkpoint, resuming from iter: ", args.resume_from_iter)
         # Load previously chosen input data!
         x_data_test = genfromtxt(checkpoint_dir + '/x_data_test.csv', delimiter=',', dtype='float32')
@@ -161,9 +156,9 @@ def main():
 
         NoT = x_data_test.shape[0]
         y_data_test = genfromtxt(checkpoint_dir + '/y_data_test.csv', dtype='float32')
-        y_data_test = np.ravel(y_data_test) #np.reshape(y_data_test, (NoT, -1))
+        y_data_test = np.ravel(y_data_test)  # np.reshape(y_data_test, (NoT, -1))
         y_data_train = genfromtxt(checkpoint_dir + '/y_data_train.csv', dtype='float32')
-        y_data_train = np.ravel(y_data_train) #np.reshape(y_data_train, (y_data_train.shape[0],-1))
+        y_data_train = np.ravel(y_data_train)  # np.reshape(y_data_train, (y_data_train.shape[0],-1))
     else:
         # save data for further training from checkpoint
         with open(checkpoint_dir + '/x_data_test.csv', "w") as output:
@@ -199,14 +194,16 @@ def main():
     #  Training
     ####################
 
-    steps_per_print = 100
+    steps_per_print = 5000
     k = 5
-    SF = 100
+    SF = 5000
     batch_size = args.mb_size
     Z_dim = args.Z_dim
     discriminator_losses = []
     generator_losses = []
     total_losses = []
+    generator_val_loss = []
+    discriminator_val_loss = []
 
     np.random.seed(0)  # fix seed
     # embedding vectors
@@ -218,13 +215,15 @@ def main():
         if i % SF == 0:
             # generate data for plotting and saving
             print('plot generated data')
-            # y_sample = np.linspace(0., 1.0, num=NoT)
-            y_sample_emb = np.transpose(np.tile(np.linspace(0., 1.0, num=NoT), (args.y_dim, 1))) * e_1
-            y_sample_emb += np.transpose(np.tile((1 - np.linspace(0., 1.0, num=NoT)), (args.y_dim, 1))) * e_2
-            Z = sample_Z(x_data_test.shape[0], Z_dim)  # FNN
+            # y_sample_emb = np.transpose(np.tile(np.linspace(0., 1.0, num=NoT), (args.y_dim, 1))) * e_1
+            # y_sample_emb += np.transpose(np.tile((1 - np.linspace(0., 1.0, num=NoT)), (args.y_dim, 1))) * e_2
+            # embedded labels
+            y_sample_emb = np.transpose(np.tile(y_data_test, (args.y_dim, 1))) * e_1 + \
+                           np.transpose(np.tile(1. - y_data_test, (args.y_dim, 1))) * e_2
+
+            Z = sample_Z(x_data_test.shape[0], Z_dim)  # generate noise
 
             x_gen = generator(tf.concat(axis=1, values=[Z, y_sample_emb]), training=False)  # FNN
-            # x_gen = generator(y_sample_emb, training=False)  #GMM
 
             fig = plot_50genes(samples=x_gen.numpy(), real_samples=x_data_test)
             plt.savefig('output_files/' + args.output_fname + '/plots{}.png'.format(str(i).zfill(3)),
@@ -235,7 +234,7 @@ def main():
             with open('output_files/' + args.output_fname + '/csv/cond_FNN_LIP_samples_alpha_' + str(args.alpha)
                       + '_iteration_' + str(i) + '.csv', "w") as output:
                 writer = csv.writer(output, lineterminator='\n')
-                x_gen_ = x_gen.numpy() # convert tensor to numpy array
+                x_gen_ = x_gen.numpy()  # convert tensor to numpy array
                 for val in x_gen_:
                     writer.writerow(val)
 
@@ -249,24 +248,15 @@ def main():
             y_mb_emb = np.transpose(np.tile(y_mb, (args.y_dim, 1))) * e_1 + \
                        np.transpose(np.tile(1. - y_mb, (args.y_dim, 1))) * e_2
 
-            # discriminator_loss_i = train_step_D(X_mb, y_mb_emb, Z_dim, discriminator, generator, discriminator_opt,
-            #                                    batch_size)
-            # discriminator_loss_i, total_loss_i = train_step_D_GP(X_mb, y_mb_emb, Z_dim, discriminator, generator,
-            #                                                     discriminator_opt, batch_size, args.lam_gp, args.K_lip)
-            # discriminator_loss_i, total_loss_i = train_step_D_GP_GMM(X_mb, y_mb_emb, Z_dim, discriminator, generator,
-            #                                                          discriminator_opt, batch_size, args.lam_gp,
-            #                                                          args.K_lip, args.alpha)
             discriminator_loss_i, total_loss_i = train_step_D_GP(X_mb, y_mb_emb, Z_dim, discriminator, generator,
-                                                                 discriminator_opt, batch_size, args.lam_gp, args.K_lip, args.alpha)
+                                                                 discriminator_opt, batch_size, args.lam_gp, args.K_lip,
+                                                                 args.alpha)
 
         discriminator_losses.append(discriminator_loss_i)
         total_losses.append(total_loss_i)
 
-        # generator_loss_i = train_step_G(y_mb_emb, Z_dim, discriminator, generator, generator_opt, batch_size)
-        # generator_loss_i = train_step_G_GMM(y_mb_emb, Z_dim, discriminator, generator, generator_opt, batch_size)
-        # generator_loss_i, _ = train_step_G_GMM_Spen(y_mb_emb, Z_dim, discriminator, generator, generator_opt,
-        #                                             batch_size, args.spen, args.alpha)
-        generator_loss_i = train_step_G(y_mb_emb, Z_dim, discriminator, generator, generator_opt, batch_size, args.alpha)
+        generator_loss_i = train_step_G(y_mb_emb, Z_dim, discriminator, generator, generator_opt, batch_size,
+                                        args.alpha)
 
         generator_losses.append(generator_loss_i)
 
@@ -286,15 +276,15 @@ def main():
                                                                  np.tile(1. - y_data_test, (args.y_dim, 1))) * e_2]),
                                    training=False)
 
-            generator_loss_epoch = generator_cum_loss(D_fake_tmp, args.alpha)
-            discriminator_loss_epoch = discriminator_cum_loss(D_real_tmp, D_fake_tmp, args.alpha)
+            generator_val_loss.append(generator_cum_loss(D_fake_tmp, args.alpha))
+            discriminator_val_loss.append(discriminator_cum_loss(D_real_tmp, D_fake_tmp, args.alpha))
 
             print("step: %i, Generator loss: %f, Discriminator loss: %f" % \
-                  (i, generator_loss_epoch, discriminator_loss_epoch)
+                  (i, generator_loss_i, discriminator_loss_i)
                   )
 
-        # Save the model every 1000 steps
-        if (i + 1) % 500 == 0:
+        # Save the model every 500 steps
+        if (i + 1) % 5000 == 0:
             checkpoint.save(file_prefix=checkpoint_prefix)
 
     # plot Losses during steps (over mini-batches)
@@ -304,6 +294,4 @@ def main():
 
 
 if __name__ == "__main__":
-    test_1()
-    print('test_1 passed')
     main()

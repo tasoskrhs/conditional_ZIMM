@@ -2,23 +2,33 @@
 import scipy.io
 import numpy as np
 
-def load_data(data_fname,
-              NoTest = 500 # number of Test samples
-              ):
+def load_data(data_fname, NoTest = 500, missing_labels='none'):
+    """
+        load data from the swiss roll dataset
+    :param data_fname: data file path
+    :param NoTest: number of Test samples
+    :param missing_labels: indicate which example case we choose for the training data set
+    :return: train and test data sets along with their labels
+    """
+    if missing_labels == 'none':
+        data = scipy.io.loadmat(data_fname + 'swiss2D_N_10000_eps_0.2_cont_label_at_0_1.mat')
 
-    #fname = 'input_data/' + data_fname
-    #data = scipy.io.loadmat(fname + '.mat')
-    data = scipy.io.loadmat(data_fname)
+    elif missing_labels == '0.25_0.3':
+        data = scipy.io.loadmat(data_fname +
+                                'swiss2D_N_12600_eps_0.2_cont_label_at_0_1_minus_range_025_03_and_06_065.mat')
+    else:
+        raise ValueError("Invalid missing_labels case")
+
     data_tmp = np.array(data['data_swiss'])
-    x_ = data_tmp[:, 0:2]  # GMM samples
-    y_ = data_tmp[:, 2]  # samples's labels -> now they lie in [0, 1]
+    x_ = data_tmp[:, 0:2]
+    y_ = data_tmp[:, 2]  # samples's labels in [0, 1]
 
-    # typecast to avoid issues later...
-    x_ = x_.astype(dtype= np.float32)
-    y_ = y_.astype(dtype= np.float32)
+    # typecast to avoid warnings later...
+    x_ = x_.astype(dtype=np.float32)
+    y_ = y_.astype(dtype=np.float32)
 
-    # idx = np.random.randint(toy_data.shape[0], size=toy_data.shape[0])
-    idx = np.random.randint(x_.shape[0], size=x_.shape[0])  # choose uniformly random integers in [0,x_.shape[0]) WITH resampling (possibly)
+    idx = np.random.randint(x_.shape[0], size=x_.shape[
+        0])  # choose uniformly random integers in [0,x_.shape[0]) WITH resampling (possibly)
     i = int(x_.shape[0]) - NoTest
 
     x_data_train = x_[idx[:i], :]
@@ -29,11 +39,14 @@ def load_data(data_fname,
     return x_data_train, y_data_train, x_data_test, y_data_test
 
 
-# Synthetic data example. Note that we provide the dir as data_fname and the .mat files have prespecified names
-def load_synth_data(data_fname,
-              NoTest = 3000, # number of Test samples
-              missing_labels='none' # indicate which example case we choose for the training data set
-              ):
+def load_synth_data(data_fname, NoTest = 3000, missing_labels='none'):
+    """
+        Synthetic data example. Note that we provide the dir as data_fname and the .mat files have prespecified names
+    :param data_fname: data directory
+    :param NoTest: number of Test samples
+    :param missing_labels: indicate which example case we choose for the training data set
+    :return: train and test data sets along with their labels
+    """
     if missing_labels == 'none':
         data = scipy.io.loadmat(data_fname + 'expressions.mat')
         x_ = np.array(data['expressions'])
@@ -54,7 +67,6 @@ def load_synth_data(data_fname,
 
         x_data_train = x_[idx[NoTest:], :]  # shuffle
         y_data_train = y_[idx[NoTest:]]
-
 
     elif missing_labels == '0.4_0.6':
         data = scipy.io.loadmat(data_fname + 'expressions_in_0.4_0.6.mat')
@@ -132,17 +144,19 @@ def load_synth_data(data_fname,
     else:
         raise ValueError("Invalid missing_labels case")
 
-
     return x_data_train, y_data_train, x_data_test, y_data_test
 
 
-# Real mass cytometery data example. Note that we provide the dir as data_fname and the .mat files have prespecified names
-def load_real_data(data_fname,
-              NoTest = 1000 # number of Test samples
-              ):
+def load_real_data(data_fname, NoTest = 1000):
+    """
+        Real mass cytometery data example. Note that we provide the dir as data_fname and the .mat files have prespecified names
+    :param data_fname: directory to datafile
+    :param NoTest: number of Test samples
+    :return: train and test data sets along with their labels
+    """
     data = scipy.io.loadmat(data_fname + 'markers_1_2_3_4_5_6_7_8_9_10_11_12_13_14_15_16.mat')
     x_lab1 = np.array(data['data_H'])
-    # typecast to avoid issues later...
+    # typecast to avoid warnings later...
     x_lab1 = x_lab1.astype(dtype=np.float32)
     x_H = x_lab1[np.random.randint(x_lab1.shape[0], size=26000), :]  # subsample at 26000 samples as reference
     y_H = np.array(0.2 * (np.ones(x_H.shape[0], dtype=np.float32)))  # arbitrarily set the label of the healthy class to '0.2'
@@ -150,7 +164,7 @@ def load_real_data(data_fname,
     # ADD 1% of label CN as SUBPOPULATION...
     data = scipy.io.loadmat(data_fname + 'CN_all_markers.mat')
     x_lab2 = np.array(data['data_CN'])
-    # typecast to avoid issues later...
+    # typecast to avoid warnings later...
     x_lab2 = x_lab2.astype(dtype=np.float32)
     x_CN_all = x_lab2[np.random.randint(x_lab2.shape[0], size=26000 + NoTest), :]  # subsample at 26000 samples as reference
     x_CN = x_CN_all[0:26000,:] # split train

@@ -102,18 +102,13 @@ def parse_args():
     return parser.parse_args()
 
 
-""" Unit tests """
-def test_1():
-    assert sum((1, 2, 3)) == 6, "Should be 6"
-
-
 def main():
     args = parse_args()
 
     # Check inputs.
     print(args.data_fname)
     if not os.path.exists(args.data_fname):
-        raise FileNotFoundError("Input data file does not exist")
+        raise FileNotFoundError("Input directory does not exist")
     if args.mb_size <= 0:
         raise ValueError("Invalid batch size")
     if args.steps <= 0:
@@ -126,7 +121,7 @@ def main():
     # load data
     x_data_train, y_data_train, x_data_test, y_data_test = load_real_data(args.data_fname, NoTest=NoT)
 
-    # Set the model up
+    # Set the model up, units_list is the architecture of the layers
     discriminator = FNN_discriminator(data_dim=args.d, y_dim=args.y_dim, units_list=[32, 32, 1])
     print(discriminator.summary())  # Functional model
 
@@ -167,7 +162,29 @@ def main():
         y_data_test = np.reshape(y_data_test, (y_data_test.shape[0], -1)) # np.ravel(y_data_test) #
         y_data_train = genfromtxt(checkpoint_dir + '/y_data_train.csv', dtype='float32')
         y_data_train = np.reshape(y_data_train, (y_data_train.shape[0],-1)) # np.ravel(y_data_train) #
+    else:
+        # save data for further training from checkpoint
+        with open(checkpoint_dir + '/x_data_test.csv', "w") as output:
+            writer = csv.writer(output, lineterminator='\n')
+            for val in x_data_test:
+                writer.writerow(val)
 
+        with open(checkpoint_dir + '/x_data_train.csv', "w") as output:
+            writer = csv.writer(output, lineterminator='\n')
+            for val in x_data_train:
+                writer.writerow(val)
+
+        with open(checkpoint_dir + '/y_data_test.csv', "w") as output:
+            writer = csv.writer(output, lineterminator='\n')
+            y_data_test_ = np.reshape(y_data_test, (NoT, -1))  # undo np.ravel()
+            for val in y_data_test_:
+                writer.writerow(val)
+
+        with open(checkpoint_dir + '/y_data_train.csv', "w") as output:
+            writer = csv.writer(output, lineterminator='\n')
+            y_data_train_ = np.reshape(y_data_train, (y_data_train.shape[0], -1))  # undo np.ravel()
+            for val in y_data_train_:
+                writer.writerow(val)
 
     if not os.path.exists('./output_files'):
         os.makedirs('./output_files')
@@ -188,6 +205,8 @@ def main():
     discriminator_losses = []
     generator_losses = []
     total_losses = []
+    generator_val_loss = []
+    discriminator_val_loss = []
 
     np.random.seed(0)  # fix seed
     # embedding vectors
@@ -203,9 +222,6 @@ def main():
             y_sample_emb = np.tile(y_data_test, (1, args.y_dim)) * e_1
             y_sample_emb += (1. - np.tile(y_data_test, (1, args.y_dim))) * e_2
 
-            #Z = sample_Z(x_data_test.shape[0], Z_dim)  # FNN
-
-            #x_gen = generator(tf.concat(axis=1, values=[Z, y_sample_emb]), training=False)  # FNN
             x_gen = generator(y_sample_emb, training=False)  #GMM
 
             fig = plot_16genes(samples=x_gen.numpy(), real_samples=x_data_test)
@@ -229,26 +245,16 @@ def main():
 
             # embedded labels
             y_mb_emb = np.tile(y_mb, (1, args.y_dim)) * e_1 + \
-                       np.tile(1. - y_mb, (1, args.y_dim)) * e_2  # CHECK!
+                       np.tile(1. - y_mb, (1, args.y_dim)) * e_2
 
-            # discriminator_loss_i = train_step_D(X_mb, y_mb_emb, Z_dim, discriminator, generator, discriminator_opt,
-            #                                    batch_size)
-            # discriminator_loss_i, total_loss_i = train_step_D_GP(X_mb, y_mb_emb, Z_dim, discriminator, generator,
-            #                                                     discriminator_opt, batch_size, args.lam_gp, args.K_lip)
             discriminator_loss_i, total_loss_i = train_step_D_GP_GMM(X_mb, y_mb_emb, Z_dim, discriminator, generator,
                                                                      discriminator_opt, batch_size, args.lam_gp,
                                                                      args.K_lip, args.alpha)
-            # discriminator_loss_i, total_loss_i = train_step_D_GP(X_mb, y_mb_emb, Z_dim, discriminator, generator,
-            #                                                      discriminator_opt, batch_size, args.lam_gp, args.K_lip, args.alpha)
+
 
         discriminator_losses.append(discriminator_loss_i)
         total_losses.append(total_loss_i)
 
-        # generator_loss_i = train_step_G(y_mb_emb, Z_dim, discriminator, generator, generator_opt, batch_size)
-        # generator_loss_i = train_step_G_GMM(y_mb_emb, Z_dim, discriminator, generator, generator_opt, batch_size)
-        # generator_loss_i, _ = train_step_G_GMM_Spen(y_mb_emb, Z_dim, discriminator, generator, generator_opt,
-        #                                             batch_size, args.spen, args.alpha)
-        # generator_loss_i = train_step_G(y_mb_emb, Z_dim, discriminator, generator, generator_opt, batch_size, args.alpha)
         generator_loss_i = train_step_G_GMM(y_mb_emb, Z_dim, discriminator, generator, generator_opt, batch_size, args.alpha)
 
         generator_losses.append(generator_loss_i)
@@ -260,21 +266,15 @@ def main():
                                                                      np.tile(1. - y_data_test, (1, args.y_dim)) * e_2]),
                                        training=False)
 
-            # Z = sample_Z(x_data_test.shape[0], Z_dim)
-            # D_fake_tmp = generator(tf.concat(axis=1, values=[Z,
-            #                                                  np.tile(y_data_test, (1, args.y_dim)) * e_1 +
-            #                                                  np.tile(1. - y_data_test, (1, args.y_dim)) * e_2]),
-            #                        training=False)
             D_fake_tmp = generator(np.tile(y_data_test, (1, args.y_dim)) * e_1
                                    + np.tile(1. - y_data_test, (1, args.y_dim)) * e_2,
                                    training=False)
 
-
-            generator_loss_epoch = generator_cum_loss(D_fake_tmp, args.alpha)
-            discriminator_loss_epoch = discriminator_cum_loss(D_real_tmp, D_fake_tmp, args.alpha)
+            generator_val_loss.append(generator_cum_loss(D_fake_tmp, args.alpha))
+            discriminator_val_loss.append(discriminator_cum_loss(D_real_tmp, D_fake_tmp, args.alpha))
 
             print("step: %i, Generator loss: %f, Discriminator loss: %f" % \
-                  (i, generator_loss_epoch, discriminator_loss_epoch)
+                  (i, generator_loss_i, discriminator_loss_i)
                   )
 
         # Save the model every 1000 steps
@@ -284,33 +284,8 @@ def main():
     # plot Losses during steps (over mini-batches)
     plot_losses_over_steps(discriminator_losses, generator_losses, save_fname=args.output_fname, alpha=args.alpha)
 
-    # save data for further training from checkpoint
-    with open(checkpoint_dir + '/x_data_test.csv', "w") as output:
-        writer = csv.writer(output, lineterminator='\n')
-        for val in x_data_test:
-            writer.writerow(val)
-
-    with open(checkpoint_dir + '/x_data_train.csv', "w") as output:
-        writer = csv.writer(output, lineterminator='\n')
-        for val in x_data_train:
-            writer.writerow(val)
-
-    with open(checkpoint_dir + '/y_data_test.csv', "w") as output:
-        writer = csv.writer(output, lineterminator='\n')
-        y_data_test = np.reshape(y_data_test, (NoT, -1)) # undo np.ravel()
-        for val in y_data_test:
-            writer.writerow(val)
-
-    with open(checkpoint_dir + '/y_data_train.csv', "w") as output:
-        writer = csv.writer(output, lineterminator='\n')
-        y_data_train = np.reshape(y_data_train, (y_data_train.shape[0], -1)) # undo np.ravel()
-        for val in y_data_train:
-            writer.writerow(val)
-
     print("end of main!")
 
 
 if __name__ == "__main__":
-    test_1()
-    print('test_1 passed')
     main()
