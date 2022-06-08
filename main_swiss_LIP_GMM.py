@@ -1,3 +1,10 @@
+"""
+    code for paper: GAN-based Training of Semi-Interpretable Generators for Biological Data Interpolation
+     https://www.mdpi.com/2076-3417/12/11/5434/htm
+
+    code by: A. Tsourtis (tsourtis@iacm.forth.gr)
+"""
+
 """ Swiss roll data example
     Lipschitz version using gradient penalty and conditional GMM"""
 import argparse
@@ -7,12 +14,14 @@ import os
 import matplotlib.pyplot as plt
 import csv
 from numpy import genfromtxt
+import json
 
-from model import GMM_generator, FNN_discriminator
-from data_loading import load_data
-from training import train_step_D_GP_GMM, train_step_G_GMM_Spen
-from cumulant_losses import discriminator_cum_loss, generator_cum_loss
-from plotting_functions import plot_color, plot_losses_over_steps
+from src.model import GMM_generator, FNN_discriminator
+from src.data_loading import load_data
+from src.training import train_step_D_GP_GMM, train_step_G_GMM_Spen
+from src.cumulant_losses import discriminator_cum_loss, generator_cum_loss
+from src.plotting_functions import plot_color, plot_losses_over_steps, plot_test_loss
+from src.checkpoint_loading import checkpoint_loading_dataset_handling
 
 
 def parse_args():
@@ -24,7 +33,7 @@ def parse_args():
     parser.add_argument(
         '--steps', dest='steps',
         help='number of training steps',
-        type=int, default=20000
+        type=int, default=200000
     )
     parser.add_argument(
         '--d', dest='d',
@@ -99,10 +108,52 @@ def parse_args():
     parser.add_argument(
         '--missing_labels', dest='missing_labels',
         help='Missing labeled data in the training set. Options: none or 0.25_0.3',
+        choices=['none', '0.25_0.3'],
         type=str, default='none'
+    )
+    parser.add_argument(
+        '--generate', dest='generate', action='store_true',
+        help='Inference only (training should have been already performed!)',
+        default=False
     )
 
     return parser.parse_args()
+
+def generate_data(step, args, x_data_test, NoT, e_1, e_2, generator):
+    """
+        function used for generating, plotting and saving samples
+    :param step: current training step (int)
+    :param args: input arguments
+    :param x_data_test: test data set
+    :param NoT: number of data samples to be generated
+    :param e_1: embedding vector (float y_dim-dimensional vector)
+    :param e_2: embedding vector (float y_dim-dimensional vector)
+    :param generator: instance to the generator network
+    :return:
+    """
+
+    print('plot generated data')
+    y_sample = np.linspace(0., 1.0, num=NoT)
+    # label embedding
+    y_sample = np.linspace(0., 1.0, num=NoT)
+    y_sample_emb = np.transpose(np.tile(np.linspace(0., 1.0, num=NoT), (args.y_dim, 1))) * e_1
+    y_sample_emb += np.transpose(np.tile((1 - np.linspace(0., 1.0, num=NoT)), (args.y_dim, 1))) * e_2
+
+    x_gen = generator(y_sample_emb, training=False)
+
+    fig = plot_color(x_gen, y_sample, x_data_test[:NoT, :], 20, 'conditional GMM')
+    plt.savefig('output_files/' + args.output_fname + '/plots{}.png'.format(str(step).zfill(3)), bbox_inches='tight',
+                format='png', dpi=100)
+    plt.close(fig)
+
+    with open('output_files/' + args.output_fname + '/csv/cGMM_LIP_samples_alpha_' + str(args.alpha)
+              + '_iteration_' + str(step) + '.csv', "w") as output:
+        writer = csv.writer(output, lineterminator='\n')
+        x_gen_ = x_gen.numpy()  # convert tensor to numpy array
+        for val in x_gen_:
+            writer.writerow(val)
+
+    return
 
 
 def main():
@@ -135,60 +186,38 @@ def main():
     generator_opt = tf.keras.optimizers.Adam(learning_rate=args.lr, epsilon=1e-8)
 
     # Save checkpoints
-    if not os.path.exists('./training_checkpoints_swiss_roll_cGMM'):
-        os.makedirs('./training_checkpoints_swiss_roll_cGMM')
-
     checkpoint_dir = './training_checkpoints_swiss_roll_cGMM'
+    if not os.path.exists(checkpoint_dir):
+        os.makedirs(checkpoint_dir)
+
     checkpoint_prefix = os.path.join(checkpoint_dir, args.saved_model_name)
     checkpoint = tf.train.Checkpoint(generator_optimizer=generator_opt,
                                      discriminator_optimizer=discriminator_opt,
                                      generator=generator,
                                      discriminator=discriminator)
+    manager = tf.train.CheckpointManager(checkpoint, checkpoint_dir, max_to_keep= 3)
 
     # load checkpoints
-    if args.resume_from_iter > 0:
-        checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir)).expect_partial() #.assert_consumed()
-        print("Found checkpoint, resuming from iter: ", args.resume_from_iter)
-        # Load previously chosen input data!
-        x_data_test = genfromtxt(checkpoint_dir + '/x_data_test.csv', delimiter=',', dtype='float32')
-        x_data_train = genfromtxt(checkpoint_dir + '/x_data_train.csv', delimiter=',', dtype='float32')
+    x_data_train, y_data_train, x_data_test, y_data_test = \
+        checkpoint_loading_dataset_handling(args, manager, checkpoint, checkpoint_dir,
+                                            x_data_train, y_data_train, x_data_test, y_data_test)
 
-        NoT = x_data_test.shape[0]
-        y_data_test = genfromtxt(checkpoint_dir + '/y_data_test.csv', dtype='float32')
-        y_data_test = np.ravel(y_data_test) #np.reshape(y_data_test, (NoT, -1))
-        y_data_train = genfromtxt(checkpoint_dir + '/y_data_train.csv', dtype='float32')
-        y_data_train = np.ravel(y_data_train) #np.reshape(y_data_train, (y_data_train.shape[0],-1))
 
-    else:
-        # save data for further training from checkpoint
-        with open(checkpoint_dir + '/x_data_test.csv', "w") as output:
-            writer = csv.writer(output, lineterminator='\n')
-            for val in x_data_test:
-                writer.writerow(val)
+    with open('output_files/' + args.output_fname + '/commandline_args.txt', 'w') as f:
+        json.dump(args.__dict__, f, indent=2)
 
-        with open(checkpoint_dir + '/x_data_train.csv', "w") as output:
-            writer = csv.writer(output, lineterminator='\n')
-            for val in x_data_train:
-                writer.writerow(val)
+    # embedding vectors
+    e_1 = np.ones(shape=(1, args.y_dim), dtype=np.float32)
+    e_2 = -np.ones(shape=(1, args.y_dim), dtype=np.float32)
 
-        with open(checkpoint_dir + '/y_data_test.csv', "w") as output:
-            writer = csv.writer(output, lineterminator='\n')
-            y_data_test_ = np.reshape(y_data_test, (NoT, -1))  # undo np.ravel()
-            for val in y_data_test_:
-                writer.writerow(val)
+    ####################
+    #  Inference
+    ####################
+    if args.generate:
+        print('generate data in: ' + 'output_files/' + args.output_fname)
+        generate_data(0, args, x_data_test, NoT, e_1, e_2, generator)  # choose 0 as the default step id in these files
 
-        with open(checkpoint_dir + '/y_data_train.csv', "w") as output:
-            writer = csv.writer(output, lineterminator='\n')
-            y_data_train_ = np.reshape(y_data_train, (y_data_train.shape[0], -1))  # undo np.ravel()
-            for val in y_data_train_:
-                writer.writerow(val)
-
-    if not os.path.exists('./output_files'):
-        os.makedirs('./output_files')
-    if not os.path.exists('./output_files/' + args.output_fname):
-        os.makedirs('./output_files/' + args.output_fname)
-    if not os.path.exists('./output_files/' + args.output_fname + '/csv'):
-        os.makedirs('./output_files/' + args.output_fname + '/csv')
+        return
 
     ####################
     #  Training
@@ -204,33 +233,14 @@ def main():
     generator_val_loss = []
     discriminator_val_loss = []
 
-    np.random.seed(0)  # fix seed
-
-    e_1 = np.ones(shape=(1, args.y_dim), dtype=np.float32)
-    e_2 = -np.ones(shape=(1, args.y_dim), dtype=np.float32)
+    # np.random.seed(0)  # fix seed
 
     for i in range(args.resume_from_iter, args.steps):
 
         if i % SF == 0:
             # generate data for plotting
             print('plot generated data')
-            y_sample = np.linspace(0., 1.0, num=NoT)
-            y_sample_emb = np.transpose(np.tile(np.linspace(0., 1.0, num=NoT), (args.y_dim, 1))) * e_1
-            y_sample_emb += np.transpose(np.tile((1 - np.linspace(0., 1.0, num=NoT)), (args.y_dim, 1))) * e_2
-
-            x_gen = generator(y_sample_emb, training=False)
-
-            fig = plot_color(x_gen, y_sample, x_data_test[:NoT, :], 20, 'conditional GMM')
-            plt.savefig('output_files/' + args.output_fname + '/plots{}.png'.format(str(i).zfill(3)), bbox_inches='tight',
-                        format='png', dpi=100)
-            plt.close(fig)
-
-            with open('output_files/' + args.output_fname + '/csv/cGMM_LIP_samples_alpha_' + str(args.alpha)
-                      + '_iteration_' + str(i) + '.csv', "w") as output:
-                writer = csv.writer(output, lineterminator='\n')
-                x_gen_ = x_gen.numpy() # convert tensor to numpy array
-                for val in x_gen_:
-                    writer.writerow(val)
+            generate_data(i, args, x_data_test, NoT, e_1, e_2, generator)
 
         for j in range(k):
             # update discriminator
@@ -239,9 +249,10 @@ def main():
             y_mb = y_data_train[idx]
 
             # label embedding
-            y_mb_emb = np.transpose(np.tile(y_mb, (args.y_dim, 1))) * e_1 + \
-                       np.transpose(np.tile(1. - y_mb, (args.y_dim, 1))) * e_2  # CHECK!
-
+            # y_mb_emb = np.transpose(np.tile(y_mb, (args.y_dim, 1))) * e_1 + \
+            #            np.transpose(np.tile(1. - y_mb, (args.y_dim, 1))) * e_2
+            y_mb_emb = np.tile(y_mb, (1, args.y_dim)) * e_1 + \
+                       np.tile(1. - y_mb, (1, args.y_dim)) * e_2
 
             discriminator_loss_i, total_loss_i = train_step_D_GP_GMM(X_mb, y_mb_emb, Z_dim, discriminator, generator,
                                                                      discriminator_opt, args.mb_size, args.lam_gp,
@@ -250,19 +261,18 @@ def main():
         discriminator_losses.append(discriminator_loss_i)
         total_losses.append(total_loss_i)
 
+        # update generator
         generator_loss_i, _ = train_step_G_GMM_Spen(y_mb_emb, Z_dim, discriminator, generator, generator_opt, args.mb_size, args.spen, args.alpha)
         generator_losses.append(generator_loss_i)
 
         if i % steps_per_print == 0:
             # run current model for test sample points
             D_real_tmp = discriminator(tf.concat(axis=1, values=[x_data_test,
-                                                                 np.transpose(np.tile(y_data_test, (
-                                                                 args.y_dim, 1))) * e_1 + np.transpose(
-                                                                     np.tile(1. - y_data_test,
-                                                                             (args.y_dim, 1))) * e_2]),
+                                                                 np.tile(y_data_test, (1, args.y_dim)) * e_1 +
+                                                                 np.tile(1. - y_data_test, (1, args.y_dim)) * e_2]),
                                        training=False)
-            D_fake_tmp = generator(np.transpose(np.tile(y_data_test, (args.y_dim, 1))) * e_1
-                                   + np.transpose(np.tile(1. - y_data_test, (args.y_dim, 1))) * e_2,
+            D_fake_tmp = generator(np.tile(y_data_test, (1, args.y_dim)) * e_1+
+                                   np.tile(1. - y_data_test, (1, args.y_dim)) * e_2,
                                    training=False)
 
             generator_val_loss.append(generator_cum_loss(D_fake_tmp, args.alpha))
@@ -272,12 +282,13 @@ def main():
                   (i, generator_loss_i, discriminator_loss_i)
                   )
 
-        # Save the model every 1000 steps
+        # Save the model every 5000 steps
         if (i + 1) % 5000 == 0:
-            checkpoint.save(file_prefix=checkpoint_prefix)
+            manager.save()
 
-    # plot Losses during steps (over mini-batches)
+    # plot training and test Losses during steps (over mini-batches)
     plot_losses_over_steps(discriminator_losses, generator_losses, save_fname=args.output_fname, alpha=args.alpha)
+    plot_test_loss(generator_val_loss, discriminator_val_loss, save_fname=args.output_fname, alpha=args.alpha)
 
     print("end of main!")
 

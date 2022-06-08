@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 from functools import partial
-from cumulant_losses import discriminator_cum_loss, generator_cum_loss
+from src.cumulant_losses import discriminator_cum_loss, generator_cum_loss
 
 
 @tf.function  # "compile" this function (for graph execution and faster performance)

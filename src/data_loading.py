@@ -22,6 +22,7 @@ def load_data(data_fname, NoTest = 500, missing_labels='none'):
     data_tmp = np.array(data['data_swiss'])
     x_ = data_tmp[:, 0:2]
     y_ = data_tmp[:, 2]  # samples's labels in [0, 1]
+    y_ = np.reshape(y_, (y_.shape[0], -1)) # flatten
 
     # typecast to avoid warnings later...
     x_ = x_.astype(dtype=np.float32)
@@ -57,7 +58,7 @@ def load_synth_data(data_fname, NoTest = 3000, missing_labels='none'):
         # typecast
         x_ = x_.astype(dtype=np.float32)
         y_ = y_.astype(dtype=np.float32)
-        y_ = np.ravel(y_)  # flatten array
+        y_ = np.reshape(y_, (y_.shape[0], -1)) # np.ravel(y_)  # flatten array
 
         idx = np.random.randint(x_.shape[0],
                                 size=x_.shape[0])  # choose uniformly random integers with possible resampling
@@ -78,7 +79,7 @@ def load_synth_data(data_fname, NoTest = 3000, missing_labels='none'):
         # typecast
         x_ = x_.astype(dtype=np.float32)
         y_ = y_.astype(dtype=np.float32)
-        y_ = np.ravel(y_)  # flatten array
+        y_ = np.reshape(y_, (y_.shape[0], -1)) # np.ravel(y_)  # flatten array
 
         idx = np.random.randint(x_.shape[0], size=x_.shape[0])
         x_data_test = x_[idx[:NoTest], :]
@@ -93,7 +94,7 @@ def load_synth_data(data_fname, NoTest = 3000, missing_labels='none'):
         # typecast
         x_remain = x_remain.astype(dtype=np.float32)
         y_remain = y_remain.astype(dtype=np.float32)
-        y_remain = np.ravel(y_remain)  # flatten array
+        y_remain = np.reshape(y_remain, (y_remain.shape[0], -1)) #np.ravel(y_remain)  # flatten array
 
         idx = np.random.randint(x_remain.shape[0], size=x_.shape[0])
         x_data_train = x_remain[idx, :]  # shuffle
@@ -122,7 +123,7 @@ def load_synth_data(data_fname, NoTest = 3000, missing_labels='none'):
         # concatenate states 1, 2 & 3
         x_ = np.concatenate((x_lab1, x_lab2, x_lab3), axis= 0)
         y_ = np.concatenate((y_lab1, y_lab2, y_lab3), axis= 0)
-        y_ = np.ravel(y_)  # np.reshape(y_, (-1, 1)) #flatten array
+        y_ = np.reshape(y_, (y_.shape[0], -1))  # np.ravel(y_)  #flatten array
 
         idx = np.random.randint(x_.shape[0], size=x_.shape[0])
         x_data_train = x_[idx, :]  # shuffle
@@ -132,7 +133,7 @@ def load_synth_data(data_fname, NoTest = 3000, missing_labels='none'):
         data = scipy.io.loadmat(data_fname + 'expressions_Label_2.mat')
         x_lab2 = np.array(data['expressions'])
         y_lab2 = np.array(0.5 * (np.ones(x_lab2.shape[0], dtype=np.float32)))  # arbitrarily set label to '0.5'
-        y_lab2 = np.ravel(y_lab2)  #  np.reshape(y_lab2, (-1, 1)) #flatten array
+        y_lab2 = np.reshape(y_lab2, (y_lab2.shape[0], -1)) #  np.ravel(y_lab2)  # flatten array
         idx = np.random.randint(x_lab2.shape[0], size=x_lab2.shape[0])
 
         # typecast

@@ -65,6 +65,35 @@ def plot_losses_over_steps(D_loss_plots, G_loss_plots, save_fname, alpha):
     plt.close(fig)
 
 
+def plot_test_loss(D_loss_plots, G_loss_plots, save_fname, alpha):
+
+    fig = plt.figure()
+
+    plt.plot(D_loss_plots)
+    plt.xlabel('Training Steps')
+    plt.ylabel('Loss')
+    plt.ylim(-5, 15)
+    plt.xticks(fontsize=14)
+    plt.yticks(fontsize=14)
+    plt.legend(['Adversarial (D_loss-G_loss)'], loc='upper right', fontsize=14)
+    plt.savefig('./output_files/' + save_fname + '/loss_plots/ccgan_D_Loss_test_set_alpha' + str(alpha) + '.png',
+                bbox_inches='tight')
+    plt.close(fig)
+
+    fig = plt.figure()
+
+    plt.plot(G_loss_plots)
+    plt.xlabel('Training Steps')
+    plt.ylabel('Loss')
+    # plt.ylim(-5, 15)
+    plt.xticks(fontsize=14)
+    plt.yticks(fontsize=14)
+    plt.legend(['Generator (G_loss)'], loc='upper right', fontsize=14)
+    plt.savefig('./output_files/' + save_fname + '/loss_plots/ccgan_G_Loss_test_set_alpha' + str(alpha) + '.png',
+                bbox_inches='tight')
+    plt.close(fig)
+
+
 def plot_50genes(samples, real_samples,  scale=16.5):
     """
             50-D marginal histograms (used in Synthetic dataset)

@@ -15,10 +15,13 @@ It will create and activate a python 3.9 environment called **tf2_env_py39** usi
 and will install all required packages.
 
 
-Please refer to https://www.tensorflow.org/install/pip#linux_1 for more information on how to set up TensorFlow with GPU acceleration.
+Please refer to https://www.tensorflow.org/install/pip#linux_1 for more information on how to set up
+TensorFlow with GPU acceleration. GPU acceleration is preferable but not mandatory.
 
-## Preparation
-* Download input data from:
+## Input data
+Please find the data corresponding to each experiment under `\input_data` . 
+For further information refer to the published paper and `data_loading.py`
+
 
 ## Training
 
@@ -27,7 +30,7 @@ python main_example_name.py --help
 usage: main_example_name.py [-h] [--data_fname] [--steps] [--d] [--mb] [--beta] [--gamma] 
                              [--K] [--K_lip] [--lam_gp] [--Z_dim] [--y_dim] [--spen]
                              [--lr]  [--saved_model] [--output_fname] [--resume_from_iter]
-                             [--missing_labels]
+                             [--missing_labels] [--generate]
 
 
 optional arguments:
@@ -48,6 +51,7 @@ optional arguments:
   --output_fname        name of the output file directory, for this experiment
   --resume_from_iter    steps corresponding to last checkpoint, needed to resume training
   --missing_labels      Missing labeled data in the training set. Options: 'none' (default), '0.4_0.6', 'state_2'
+  --generate            Generate samples, provided training has taken place (default: False)
 ```
 
 - ### Example 1: Train Lipschitz GAN using a 2-D SwissRoll dataset
@@ -61,7 +65,7 @@ python main_swiss_LIP.py  --steps 100000
 ```
 python main_swiss_LIP_GMM.py -spen 0.002
 ```
-
+The experiment parameters are saved in `\output_files\experiment_name\commandline_args.txt`.
 * ### Example 2: Synthetic RNA-seq data
 1. Train using the conditional feedforward neural network (cFNN) generator with gating on the output layer. Training data labels lie uniformly in [0, 1]:
 ``` python
@@ -83,3 +87,22 @@ python main_real_data_LIP_ZIMM.py
 ```
 
 ## Inference
+During training, generated data, plots and running losses are being exported in the corresponding subdirectories under `\output_files\experiment_name\`.
+Assuming training has already taken place (checkpoint files containing model weights have been created), we can further generate data by:
+``` python
+python main_example_name.py --generate
+```
+The generated data are:
+* .csv file containing generated points (rows: samples, columns: dimensions)
+* corresponding plots (similar to the ones during training)
+
+Further training can be carried out as shown in the previous section. 
+
+<!-- 
+## Visualization
+PCA plots...
+-->
+
+ 
+## Questions
+Please don't hesitate to send me an email.
