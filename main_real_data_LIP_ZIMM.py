@@ -223,9 +223,9 @@ def main():
     #  Training
     ####################
 
-    steps_per_print = 5000
+    steps_per_print = 500
     k = 5
-    SF = 5000
+    SF = 500
     batch_size = args.mb_size
     Z_dim = args.Z_dim
     discriminator_losses = []
@@ -283,14 +283,13 @@ def main():
                   (i, generator_loss_i, discriminator_loss_i)
                   )
 
-        # Save the model every 1000 steps
-        if (i + 1) % 5000 == 0:
-            # checkpoint.save(file_prefix=checkpoint_prefix)
+        # Save the model
+        if (i + 1) % 500 == 0:
             manager.save()
 
-        # plot training and test Losses during steps (over mini-batches)
-        plot_losses_over_steps(discriminator_losses, generator_losses, save_fname=args.output_fname, alpha=args.alpha)
-        plot_test_loss(generator_val_loss, discriminator_val_loss, save_fname=args.output_fname, alpha=args.alpha)
+    # plot training and test Losses during steps (over mini-batches)
+    plot_losses_over_steps(discriminator_losses, generator_losses, save_fname=args.output_fname, alpha=args.alpha)
+    plot_test_loss(generator_val_loss, discriminator_val_loss, save_fname=args.output_fname, alpha=args.alpha)
 
     print("end of main!")
 
