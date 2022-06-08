@@ -77,7 +77,8 @@ python main_synth_data_LIP_ZIMM.py --missing_labels 0.4_0.6
 ```
 
 * ### Example 3: Real single-cell mass cytometry data
-1. Train using the conditional feedforward neural network (cFNN) generator with gating on the output layer. Here we have continue training from a previous run of 100K steps for another 200K steps:
+1. Train using the conditional feedforward neural network (cFNN) generator with gating on the output layer. 
+   Here we continue training from a previous run of 100K steps for another 200K steps:
 ``` python
 python main_real_data_LIP.py --steps 300000 --resume_from_iter 100000
 ```

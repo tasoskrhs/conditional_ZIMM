@@ -249,8 +249,6 @@ def main():
             y_mb = y_data_train[idx]
 
             # label embedding
-            # y_mb_emb = np.transpose(np.tile(y_mb, (args.y_dim, 1))) * e_1 + \
-            #            np.transpose(np.tile(1. - y_mb, (args.y_dim, 1))) * e_2
             y_mb_emb = np.tile(y_mb, (1, args.y_dim)) * e_1 + \
                        np.tile(1. - y_mb, (1, args.y_dim)) * e_2
 
