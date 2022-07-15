@@ -3,7 +3,7 @@
 
 ### Paper: [https://doi.org/10.3390/app12115434](https://www.mdpi.com/2076-3417/12/11/5434/htm)
 This repository hosts the official TensorFlow implementation of our paper, 
-published at MDPI.
+published in MDPI.
 
 ## Environment Setup
 We assume that conda is already installed on your system.
@@ -27,7 +27,7 @@ For further information refer to the published paper and `data_loading.py`
 
 ``` python
 python main_example_name.py --help
-usage: main_example_name.py [-h] [--data_fname] [--steps] [--d] [--mb] [--beta] [--gamma] 
+usage: main_example_name.py [-h] [--data_fname] [--steps] [--d] [--mb] [--alpha] 
                              [--K] [--K_lip] [--lam_gp] [--Z_dim] [--y_dim] [--spen]
                              [--lr]  [--saved_model] [--output_fname] [--resume_from_iter]
                              [--missing_labels] [--generate]
